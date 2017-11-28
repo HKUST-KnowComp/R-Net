@@ -3,10 +3,10 @@ Tensorflow implementation of [R-NET: MACHINE READING COMPREHENSION WITH
 SELF-MATCHING NETWORKS](https://www.microsoft.com/en-us/research/wp-content/uploads/2017/05/r-net.pdf).
 
 ## Requirements
-###General
+#### General
   * Python >= 3.5
   * unzip, wget
-###Python Packages
+#### Python Packages
   * Tensorflow >= 1.2.0
   * nltk
   * tqdm
