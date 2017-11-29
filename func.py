@@ -72,8 +72,8 @@ def dot_attention(inputs, memory, mask, hidden, keep_prob=1.0, is_train=None, sc
         d_memory = dropout(memory, keep_prob=keep_prob, is_train=is_train)
 
         JX = tf.shape(inputs)[1]
-        inputs_ = tf.layers.dense(d_inputs, hidden)
-        memory_ = tf.layers.dense(d_memory, hidden)
+        inputs_ = tf.nn.relu(tf.layers.dense(d_inputs, hidden))
+        memory_ = tf.nn.relu(tf.layers.dense(d_memory, hidden))
 
         outputs = tf.matmul(inputs_, tf.transpose(
             memory_, [0, 2, 1])) / hidden ** 0.5
