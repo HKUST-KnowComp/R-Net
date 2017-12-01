@@ -1,14 +1,17 @@
 import tensorflow as tf
 import random
 from tqdm import tqdm
-import nltk
+import spacy
 import json
 from collections import Counter
 import numpy as np
 
+nlp = spacy.load("en", parse=False, tag=False, entity=False)
 
-def word_tokenize(tokens):
-    return [token.replace("''", '"').replace("``", '"') for token in nltk.word_tokenize(tokens)]
+
+def word_tokenize(sent):
+    doc = nlp(sent)
+    return [token.text for token in doc]
 
 
 def convert_idx(text, tokens):
@@ -63,7 +66,7 @@ def process_file(filename, data_type, word_counter, char_counter):
                         for idx, span in enumerate(spans):
                             if not (answer_end <= span[0] or answer_start >= span[1]):
                                 answer_span.append(idx)
-                        y1, y2 = answer_span[0], answer_span[-1] + 1
+                        y1, y2 = answer_span[0], answer_span[-1]
                         y1s.append(y1)
                         y2s.append(y2)
                     example = {"context_tokens": context_tokens, "context_chars": context_chars, "ques_tokens": ques_tokens,
@@ -168,7 +171,7 @@ def build_features(config, examples, data_type, out_file, word2idx_dict, char2id
                 ques_char_idxs[i, j] = _get_char(char)
 
         start, end = example["y1s"][-1], example["y2s"][-1]
-        y1[start], y2[end - 1] = 1.0, 1.0
+        y1[start], y2[end] = 1.0, 1.0
 
         record = tf.train.Example(features=tf.train.Features(feature={
                                   "context_idxs": tf.train.Feature(bytes_list=tf.train.BytesList(value=[context_idxs.tostring()])),

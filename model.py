@@ -83,36 +83,36 @@ class Model(object):
                             is_train=self.is_train)
 
         with tf.variable_scope("attention"):
-            qc_att = dot_attention(c, q, mask=self.q_mask, hidden=d, keep_prob=config.keep_prob,
-                                   is_train=self.is_train)
+            qc_att = dot_attention(c, q, mask=self.q_mask, hidden=d,
+                                   keep_prob=config.keep_prob, is_train=self.is_train)
             att = stacked_gru(qc_att, N, d, num_layers=1, seq_len=self.c_len,
                               keep_prob=config.keep_prob, is_train=self.is_train)
 
         with tf.variable_scope("match"):
-            self_att = dot_attention(att, att, mask=self.c_mask, hidden=d, keep_prob=config.keep_prob,
-                                     is_train=self.is_train)
+            self_att = dot_attention(
+                att, att, mask=self.c_mask, hidden=d, keep_prob=config.keep_prob, is_train=self.is_train)
             match = stacked_gru(self_att, N, d, num_layers=1, seq_len=self.c_len,
                                 keep_prob=config.keep_prob, is_train=self.is_train)
 
         with tf.variable_scope("pointer"):
-            d_q = dropout(q, keep_prob=config.keep_prob,
-                          is_train=self.is_train)
+            d_q = dropout(q[:, :, -2 * d:],
+                          keep_prob=config.keep_prob, is_train=self.is_train)
+            d_match = dropout(match, keep_prob=config.keep_prob,
+                              is_train=self.is_train)
             init = summ(d_q, d, mask=self.q_mask)
             hidden = init.get_shape().as_list()[-1]
             with tf.variable_scope("fw"):
-                d_match = dropout(
-                    match, keep_prob=config.keep_prob, is_train=self.is_train)
+                cell_fw = GRUCell(hidden)
                 inp, logits1_fw = pointer(d_match, init, d, mask=self.c_mask)
-                _, state = GRUCell(hidden).__call__(inp, init)
-                _, logits2_fw = pointer(
-                    d_match, state, d, mask=self.c_mask, reuse=True)
+                _, state = cell_fw(inp, init)
+                tf.get_variable_scope().reuse_variables()
+                _, logits2_fw = pointer(d_match, state, d, mask=self.c_mask)
             with tf.variable_scope("bw"):
-                d_match = dropout(
-                    match, keep_prob=config.keep_prob, is_train=self.is_train)
+                cell_bw = GRUCell(hidden)
                 inp, logits2_bw = pointer(d_match, init, d, mask=self.c_mask)
-                _, state = GRUCell(hidden).__call__(inp, init)
-                _, logits1_bw = pointer(
-                    d_match, state, d, mask=self.c_mask, reuse=True)
+                _, state = cell_bw(inp, init)
+                tf.get_variable_scope().reuse_variables()
+                _, logits1_bw = pointer(d_match, state, d, mask=self.c_mask)
             logits1 = (logits1_fw + logits1_bw) / 2.
             logits2 = (logits2_fw + logits2_bw) / 2.
 

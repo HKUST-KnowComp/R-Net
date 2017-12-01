@@ -13,5 +13,5 @@ mkdir -p $GLOVE_DIR
 wget http://nlp.stanford.edu/data/glove.840B.300d.zip -O $GLOVE_DIR/glove.840B.300d.zip
 unzip $GLOVE_DIR/glove.840B.300d.zip -d $GLOVE_DIR
 
-# Download nltk language models
-python -m nltk.downloader 'punkt'
+# Download Spacy language models
+python3 -m spacy download en

@@ -1,6 +1,6 @@
 # R-Net
   * Tensorflow implementation of [R-NET: MACHINE READING COMPREHENSION WITH
-SELF-MATCHING NETWORKS](https://www.microsoft.com/en-us/research/wp-content/uploads/2017/05/r-net.pdf).
+SELF-MATCHING NETWORKS](https://www.microsoft.com/en-us/research/wp-content/uploads/2017/05/r-net.pdf). This project is specially designed for the [SQuAD](https://arxiv.org/pdf/1606.05250.pdf) dataset.
   * Should you have any question, please contact [Wenxuan Zhou](wzhouad@connect.ust.hk).
 
 ## Requirements
@@ -9,7 +9,7 @@ SELF-MATCHING NETWORKS](https://www.microsoft.com/en-us/research/wp-content/uplo
   * unzip, wget
 #### Python Packages
   * Tensorflow >= 1.2.0
-  * nltk
+  * spaCy
   * tqdm
 
 ## Usage
@@ -38,13 +38,13 @@ The default directory for tensorboard log file is `log/event`
   * When the loss on dev set increases in a certain period, the learning rate is halved.
   * During prediction, the project adopts search method and bidirectional answer pointer presented in [Machine Comprehension Using Match-LSTM and Answer Pointer](https://arxiv.org/pdf/1608.07905.pdf).
 
-## Results
+## Current Results
 
 ||EM|F1|
 |---|---|---|
 |original paper|71.1|79.5|
 |this project|69.37|78.42|
 
-<img src="img/em.jpg" width="500">
+<img src="img/em.jpg" width="300">
 
-<img src="img/f1.jpg" width="500">
+<img src="img/f1.jpg" width="300">

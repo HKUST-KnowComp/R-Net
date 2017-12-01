@@ -63,21 +63,21 @@ flags.DEFINE_integer("glove_dim", 300, "Embedding dimension for Glove")
 flags.DEFINE_integer("char_dim", 8, "Embedding dimension for char")
 
 flags.DEFINE_integer("para_limit", 400, "Limit length for paragraph")
-flags.DEFINE_integer("ques_limit", 30, "Limit length for question")
+flags.DEFINE_integer("ques_limit", 50, "Limit length for question")
 flags.DEFINE_integer("char_limit", 16, "Limit length for character")
 flags.DEFINE_integer("word_count_limit", -1, "Min count for word")
 flags.DEFINE_integer("char_count_limit", -1, "Min count for char")
 
-flags.DEFINE_integer("min_after_deque", 10000, "Min examples after deque")
+flags.DEFINE_integer("min_after_deque", 15000, "Min examples after deque")
 flags.DEFINE_integer("num_threads", 4, "Number of threads in file queue")
-flags.DEFINE_integer("capacity", 12000, "Capacity of tfrecord queue")
+flags.DEFINE_integer("capacity", 17000, "Capacity of tfrecord queue")
 
 flags.DEFINE_integer("batch_size", 60, "Batch size")
 flags.DEFINE_integer("num_steps", 50000, "Number of steps")
 flags.DEFINE_integer("checkpoint", 1000,
                      "checkpoint to save and evaluate the model")
 flags.DEFINE_integer("period", 100, "period to save batch loss")
-flags.DEFINE_integer("val_num_batches", 250,
+flags.DEFINE_integer("val_num_batches", 300,
                      "Number of batches to evaluate the model")
 flags.DEFINE_float("init_lr", 0.5, "Initial learning rate for Adadelta")
 flags.DEFINE_float("keep_prob", 0.7, "Dropout keep prob between layers")
