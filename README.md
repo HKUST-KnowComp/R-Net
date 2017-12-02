@@ -43,7 +43,7 @@ The default directory for tensorboard log file is `log/event`
 ||EM|F1|
 |---|---|---|
 |original paper|71.1|79.5|
-|this project|69.37|78.42|
+|this project|70.32|79.10|
 
 <img src="img/em.jpg" width="300">
 
