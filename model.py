@@ -22,6 +22,21 @@ class Model(object):
         self.c_len = tf.reduce_sum(tf.cast(self.c_mask, tf.int32), axis=1)
         self.q_len = tf.reduce_sum(tf.cast(self.q_mask, tf.int32), axis=1)
 
+        if opt:
+            N, CL = config.batch_size, config.char_limit
+            self.c_maxlen = tf.reduce_max(self.c_len)
+            self.q_maxlen = tf.reduce_max(self.q_len)
+            self.c = tf.slice(self.c, [0, 0], [N, self.c_maxlen])
+            self.q = tf.slice(self.q, [0, 0], [N, self.q_maxlen])
+            self.c_mask = tf.slice(self.c_mask, [0, 0], [N, self.c_maxlen])
+            self.q_mask = tf.slice(self.q_mask, [0, 0], [N, self.q_maxlen])
+            self.ch = tf.slice(self.ch, [0, 0, 0], [N, self.c_maxlen, CL])
+            self.qh = tf.slice(self.qh, [0, 0, 0], [N, self.q_maxlen, CL])
+            self.y1 = tf.slice(self.y1, [0, 0], [N, self.c_maxlen])
+            self.y2 = tf.slice(self.y2, [0, 0], [N, self.c_maxlen])
+        else:
+            self.c_maxlen. self.q_maxlen = config.para_limit, config.ques_limit
+
         self.ch_len = tf.reshape(tf.reduce_sum(
             tf.cast(tf.cast(self.ch, tf.bool), tf.int32), axis=2), [-1])
         self.qh_len = tf.reshape(tf.reduce_sum(
@@ -43,12 +58,12 @@ class Model(object):
 
     def ready(self):
         config = self.config
-        N, PL, QL, CL, d, dc, dg = config.batch_size, config.para_limit, config.ques_limit, config.char_limit, config.hidden, config.char_dim, config.char_hidden
+        N, PL, QL, CL, d, dc, dg = config.batch_size, self.c_maxlen, self.q_maxlen, config.char_limit, config.hidden, config.char_dim, config.char_hidden
 
         with tf.variable_scope("emb"):
             with tf.variable_scope("char"):
                 ch_emb = tf.reshape(tf.nn.embedding_lookup(
-                    self.char_mat, self.ch), [-1, CL, dc])
+                    self.char_mat, self.ch), [N * PL, CL, dc])
                 qh_emb = tf.reshape(tf.nn.embedding_lookup(
                     self.char_mat, self.qh), [-1, CL, dc])
                 ch_emb = dropout(ch_emb, keep_prob=config.keep_prob,

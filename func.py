@@ -31,10 +31,10 @@ def stacked_gru(inputs, batch, hidden, num_layers, seq_len, keep_prob=1.0, is_tr
 def dropout(args, keep_prob, is_train, mode="recurrent"):
     if keep_prob < 1.0:
         noise_shape = None
-        shape = args.get_shape().as_list()
+        shape = tf.shape(args)
         if mode == "embedding":
             noise_shape = [shape[0], 1]
-        if mode == "recurrent":
+        if mode == "recurrent" and len(args.get_shape().as_list()) == 3:
             noise_shape = [shape[0], 1, shape[-1]]
         args = tf.cond(is_train, lambda: tf.nn.dropout(
             args, keep_prob, noise_shape=noise_shape), lambda: args)
@@ -78,7 +78,7 @@ def dot_attention(inputs, memory, mask, hidden, keep_prob=1.0, is_train=None, sc
         memory_ = tf.nn.relu(dense(d_memory, hidden, scope="memory"))
 
         outputs = tf.matmul(inputs_, tf.transpose(
-            memory_, [0, 2, 1])) / hidden ** 0.5
+            memory_, [0, 2, 1])) / (hidden ** 0.5)
         mask = tf.tile(tf.expand_dims(mask, axis=1), [1, JX, 1])
         logits = tf.nn.softmax(softmax_mask(outputs, mask))
         outputs = tf.matmul(logits, memory)
@@ -91,9 +91,10 @@ def dot_attention(inputs, memory, mask, hidden, keep_prob=1.0, is_train=None, sc
 
 def dense(inputs, hidden, use_bias=True, scope="dense"):
     with tf.variable_scope(scope):
-        shape = inputs.get_shape().as_list()
-        dim = shape[-1]
-        out_shape = [shape[idx] for idx in range(len(shape) - 1)] + [hidden]
+        shape = tf.shape(inputs)
+        dim = inputs.get_shape().as_list()[-1]
+        out_shape = [shape[idx] for idx in range(
+            len(inputs.get_shape().as_list()) - 1)] + [hidden]
         flat_inputs = tf.reshape(inputs, [-1, dim])
         W = tf.get_variable("W", [dim, hidden])
         res = tf.matmul(flat_inputs, W)
