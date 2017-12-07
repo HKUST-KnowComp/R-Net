@@ -6,7 +6,7 @@ import json
 from collections import Counter
 import numpy as np
 
-nlp = spacy.load("en", parse=False, tag=False, entity=False)
+nlp = spacy.blank("en")
 
 
 def word_tokenize(sent):
@@ -210,13 +210,14 @@ def prepro(config):
         char_counter, "char", vec_size=config.char_dim)
     build_features(config, train_examples, "train", config.train_record_file,
                    word2idx_dict, char2idx_dict, filter_func=filter_func, eval_examples=train_eval)
-    build_features(config, dev_examples, "dev", config.dev_record_file, word2idx_dict,
-                   char2idx_dict, filter_func=filter_func, eval_examples=dev_eval)
-    meta = build_features(config, test_examples, "test", config.test_record_file,
-                          word2idx_dict, char2idx_dict, filter_func=filter_func, eval_examples=test_eval)
+    dev_meta = build_features(config, dev_examples, "dev", config.dev_record_file,
+                              word2idx_dict, char2idx_dict, filter_func=filter_func, eval_examples=dev_eval)
+    test_meta = build_features(config, test_examples, "test", config.test_record_file,
+                               word2idx_dict, char2idx_dict, filter_func=filter_func, eval_examples=test_eval)
     save(config.word_emb_file, word_emb_mat, message="word embedding")
     save(config.char_emb_file, char_emb_mat, message="char embedding")
     save(config.train_eval_file, train_eval, message="train eval")
     save(config.dev_eval_file, dev_eval, message="dev eval")
     save(config.test_eval_file, test_eval, message="test eval")
-    save(config.test_meta, meta, message="test meta")
+    save(config.dev_meta, dev_meta, message="dev meta")
+    save(config.test_meta, test_meta, message="test meta")

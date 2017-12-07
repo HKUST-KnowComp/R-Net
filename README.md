@@ -9,7 +9,7 @@ SELF-MATCHING NETWORKS](https://www.microsoft.com/en-us/research/wp-content/uplo
   * unzip, wget
 #### Python Packages
   * Tensorflow >= 1.2.0
-  * spaCy
+  * spaCy >= 2.0.0
   * tqdm
 
 ## Usage

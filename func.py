@@ -1,31 +1,45 @@
 import tensorflow as tf
-from tensorflow.python.ops.nn import bidirectional_dynamic_rnn
 from tensorflow.python.ops.rnn_cell import GRUCell
 
 INF = 1e30
 
 
-def stacked_gru(inputs, batch, hidden, num_layers, seq_len, keep_prob=1.0, is_train=None, std=0.01, concat_layers=True, dtype=tf.float32, scope="StackedGRU"):
+def stacked_gru(inputs, hidden, num_layers, seq_len, batch=None, keep_prob=1.0, is_train=None, std=0.01, concat_layers=True, dtype=tf.float32, scope="StackedGRU"):
     with tf.variable_scope(scope):
         outputs = [inputs]
         for layer in range(num_layers):
             with tf.variable_scope("Layer_{}".format(layer)):
-                cell_fw = GRUCell(hidden)
-                cell_bw = GRUCell(hidden)
-                init_fw = tf.tile(tf.get_variable("init_fw", [
-                                  1, hidden], initializer=tf.truncated_normal_initializer(stddev=std)), [batch, 1])
-                init_bw = tf.tile(tf.get_variable("init_bw", [
-                                  1, hidden], initializer=tf.truncated_normal_initializer(stddev=std)), [batch, 1])
-                d_inputs = dropout(
-                    outputs[-1], keep_prob=keep_prob, is_train=is_train)
-                (out_fw, out_bw), _ = bidirectional_dynamic_rnn(cell_fw, cell_bw, d_inputs,
-                                                                initial_state_fw=init_fw, initial_state_bw=init_bw, sequence_length=seq_len, dtype=dtype)
+                with tf.variable_scope("fw"):
+                    inputs_fw = dropout(
+                        outputs[-1], keep_prob=keep_prob, is_train=is_train)
+                    cell_fw = GRUCell(hidden)
+                    init_fw = None
+                    if batch is not None:
+                        init_fw = tf.tile(tf.get_variable("init_fw", [
+                                          1, hidden], initializer=tf.truncated_normal_initializer(stddev=std)), [batch, 1])
+                    out_fw, state_fw = tf.nn.dynamic_rnn(
+                        cell_fw, inputs_fw, sequence_length=seq_len, initial_state=init_fw, dtype=tf.float32)
+                with tf.variable_scope("bw"):
+                    _inputs_bw = tf.reverse_sequence(
+                        outputs[-1], seq_lengths=seq_len, seq_dim=1, batch_dim=0)
+                    inputs_bw = dropout(
+                        _inputs_bw, keep_prob=keep_prob, is_train=is_train)
+                    cell_bw = GRUCell(hidden)
+                    init_bw = None
+                    if batch is not None:
+                        init_bw = tf.tile(tf.get_variable("init_bw", [
+                                          1, hidden], initializer=tf.truncated_normal_initializer(stddev=std)), [batch, 1])
+                    out_bw, state_bw = tf.nn.dynamic_rnn(
+                        cell_bw, inputs_bw, sequence_length=seq_len, initial_state=init_bw, dtype=tf.float32)
+                    out_bw = tf.reverse_sequence(
+                        out_bw, seq_lengths=seq_len, seq_dim=1, batch_dim=0)
                 outputs.append(tf.concat([out_fw, out_bw], axis=2))
         if concat_layers:
             res = tf.concat(outputs[1:], axis=2)
         else:
             res = outputs[-1]
-        return res
+        state = tf.concat([state_fw, state_bw], axis=1)
+        return res, state
 
 
 def dropout(args, keep_prob, is_train, mode="recurrent"):
@@ -45,10 +59,12 @@ def softmax_mask(val, mask):
     return -INF * (1 - tf.cast(mask, tf.float32)) + val
 
 
-def pointer(inputs, state, hidden, mask, scope="pointer"):
+def pointer(inputs, state, hidden, mask, keep_prob=1.0, is_train=None, scope="pointer"):
     with tf.variable_scope(scope):
-        u = tf.concat([tf.tile(tf.expand_dims(state, axis=1), [
-                      1, tf.shape(inputs)[1], 1]), inputs], axis=2)
+        d_inputs = dropout(inputs, keep_prob=keep_prob, is_train=is_train)
+        d_state = dropout(state, keep_prob=keep_prob, is_train=is_train)
+        u = tf.concat([tf.tile(tf.expand_dims(d_state, axis=1), [
+            1, tf.shape(d_inputs)[1], 1]), d_inputs], axis=2)
         s0 = tf.nn.tanh(dense(u, hidden, use_bias=False, scope="s0"))
         s = dense(s0, 1, use_bias=False, scope="s")
         s1 = softmax_mask(tf.squeeze(s, [2]), mask)
@@ -57,9 +73,10 @@ def pointer(inputs, state, hidden, mask, scope="pointer"):
         return res, s1
 
 
-def summ(memory, hidden, mask, scope="summ"):
+def summ(memory, hidden, mask, keep_prob=1.0, is_train=None, scope="summ"):
     with tf.variable_scope(scope):
-        s0 = tf.nn.tanh(dense(memory, hidden, scope="s0"))
+        d_memory = dropout(memory, keep_prob=keep_prob, is_train=is_train)
+        s0 = tf.nn.tanh(dense(d_memory, hidden, scope="s0"))
         s = dense(s0, 1, use_bias=False, scope="s")
         s1 = softmax_mask(tf.squeeze(s, [2]), mask)
         a = tf.expand_dims(tf.nn.softmax(s1), axis=2)

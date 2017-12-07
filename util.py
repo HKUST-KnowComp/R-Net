@@ -4,44 +4,36 @@ from collections import Counter
 import string
 
 
-def create_batch(filename, config, test=False):
-    if test:
-        queue = tf.train.string_input_producer([filename], num_epochs=1)
-        min_after_deque = 0
-    else:
-        queue = tf.train.string_input_producer([filename])
-        min_after_deque = config.min_after_deque
-
-    para_limit = config.para_limit
-    ques_limit = config.ques_limit
-    char_limit = config.char_limit
-    num_threads = config.num_threads
-    batch_size = config.batch_size
-    reader = tf.TFRecordReader()
-    _, serialized_example = reader.read(queue)
-    features = tf.parse_single_example(serialized_example,
-                                       features={
-                                           "context_idxs": tf.FixedLenFeature([], tf.string),
-                                           "ques_idxs": tf.FixedLenFeature([], tf.string),
-                                           "context_char_idxs": tf.FixedLenFeature([], tf.string),
-                                           "ques_char_idxs": tf.FixedLenFeature([], tf.string),
-                                           "y1": tf.FixedLenFeature([], tf.string),
-                                           "y2": tf.FixedLenFeature([], tf.string),
-                                           "id": tf.FixedLenFeature([], tf.int64)
-                                       })
-    context_idxs = tf.reshape(tf.decode_raw(
-        features["context_idxs"], tf.int32), [para_limit])
-    ques_idxs = tf.reshape(tf.decode_raw(
-        features["ques_idxs"], tf.int32), [ques_limit])
-    context_char_idxs = tf.reshape(tf.decode_raw(
-        features["context_char_idxs"], tf.int32), [para_limit, char_limit])
-    ques_char_idxs = tf.reshape(tf.decode_raw(
-        features["ques_char_idxs"], tf.int32), [ques_limit, char_limit])
-    y1 = tf.reshape(tf.decode_raw(features["y1"], tf.float32), [para_limit])
-    y2 = tf.reshape(tf.decode_raw(features["y2"], tf.float32), [para_limit])
-    qa_id = features["id"]
-    return tf.train.shuffle_batch([context_idxs, ques_idxs, context_char_idxs, ques_char_idxs, y1, y2, qa_id], batch_size=batch_size,
-                                  num_threads=num_threads, min_after_dequeue=min_after_deque, capacity=config.capacity)
+def get_record_parser(config):
+    def parse(example):
+        para_limit = config.para_limit
+        ques_limit = config.ques_limit
+        char_limit = config.char_limit
+        features = tf.parse_single_example(example,
+                                           features={
+                                               "context_idxs": tf.FixedLenFeature([], tf.string),
+                                               "ques_idxs": tf.FixedLenFeature([], tf.string),
+                                               "context_char_idxs": tf.FixedLenFeature([], tf.string),
+                                               "ques_char_idxs": tf.FixedLenFeature([], tf.string),
+                                               "y1": tf.FixedLenFeature([], tf.string),
+                                               "y2": tf.FixedLenFeature([], tf.string),
+                                               "id": tf.FixedLenFeature([], tf.int64)
+                                           })
+        context_idxs = tf.reshape(tf.decode_raw(
+            features["context_idxs"], tf.int32), [para_limit])
+        ques_idxs = tf.reshape(tf.decode_raw(
+            features["ques_idxs"], tf.int32), [ques_limit])
+        context_char_idxs = tf.reshape(tf.decode_raw(
+            features["context_char_idxs"], tf.int32), [para_limit, char_limit])
+        ques_char_idxs = tf.reshape(tf.decode_raw(
+            features["ques_char_idxs"], tf.int32), [ques_limit, char_limit])
+        y1 = tf.reshape(tf.decode_raw(
+            features["y1"], tf.float32), [para_limit])
+        y2 = tf.reshape(tf.decode_raw(
+            features["y2"], tf.float32), [para_limit])
+        qa_id = features["id"]
+        return context_idxs, ques_idxs, context_char_idxs, ques_char_idxs, y1, y2, qa_id
+    return parse
 
 
 def convert_tokens(eval_file, qa_id, pp1, pp2):

@@ -5,10 +5,10 @@ from tqdm import tqdm
 import os
 
 from model import Model
-from util import create_batch, convert_tokens, evaluate
+from util import get_record_parser, convert_tokens, evaluate
 
 
-def train(config):
+def train(config, load=False):
     with open(config.word_emb_file, "r") as fh:
         word_mat = np.array(json.load(fh), dtype=np.float32)
     with open(config.char_emb_file, "r") as fh:
@@ -17,10 +17,17 @@ def train(config):
         train_eval_file = json.load(fh)
     with open(config.dev_eval_file, "r") as fh:
         dev_eval_file = json.load(fh)
+    with open(config.dev_meta, "r") as fh:
+        meta = json.load(fh)
+
+    dev_total = meta["total"]
 
     print("Building model...")
-    train_batch = create_batch(config.train_record_file, config)
-    dev_batch = create_batch(config.dev_record_file, config)
+    parser = get_record_parser(config)
+    train_batch = tf.data.TFRecordDataset(config.train_record_file).map(parser).shuffle(
+        config.capacity).repeat().batch(config.batch_size).make_one_shot_iterator()
+    dev_batch = tf.data.TFRecordDataset(config.dev_record_file).map(
+        parser).repeat().batch(config.batch_size).make_one_shot_iterator()
     with tf.variable_scope("model"):
         model_train = Model(config, train_batch, word_mat, char_mat)
         tf.get_variable_scope().reuse_variables()
@@ -37,12 +44,12 @@ def train(config):
     with tf.Session(config=sess_config) as sess:
         writer = tf.summary.FileWriter(config.log_dir)
         sess.run(tf.global_variables_initializer())
-        coord = tf.train.Coordinator()
-        threads = tf.train.start_queue_runners(coord=coord)
         saver = tf.train.Saver()
         sess.run(tf.assign(model_train.is_train,
                            tf.constant(True, dtype=tf.bool)))
         sess.run(tf.assign(model_train.lr, tf.constant(lr, dtype=tf.float32)))
+        if load:
+            saver.restore(sess, tf.train.latest_checkpoint(config.save_dir))
 
         for _ in tqdm(range(1, config.num_steps + 1)):
             global_step = sess.run(model_train.global_step) + 1
@@ -60,7 +67,7 @@ def train(config):
                     writer.add_summary(s, global_step)
 
                 metrics, summ = evaluate_batch(
-                    model_dev, config.val_num_batches, dev_eval_file, sess, "dev")
+                    model_dev, dev_total // config.batch_size, dev_eval_file, sess, "dev")
                 sess.run(tf.assign(model_train.is_train,
                                    tf.constant(True, dtype=tf.bool)))
 
@@ -82,8 +89,6 @@ def train(config):
                 filename = os.path.join(
                     config.save_dir, "model_{}.ckpt".format(global_step))
                 saver.save(sess, filename)
-        coord.request_stop()
-        coord.join(threads)
 
 
 def test(config):
@@ -99,7 +104,8 @@ def test(config):
     total = meta["total"]
 
     print("Loading model...")
-    test_batch = create_batch(config.test_record_file, config, test=True)
+    test_batch = tf.data.TFRecordDataset(config.test_record_file).map(
+        get_record_parser(config)).batch(config.batch_size).make_one_shot_iterator()
     with tf.variable_scope("model"):
         model = Model(config, test_batch, word_mat, char_mat, trainable=False)
 
@@ -107,11 +113,7 @@ def test(config):
     sess_config.gpu_options.allow_growth = True
 
     with tf.Session(config=sess_config) as sess:
-        init_op = tf.group(tf.global_variables_initializer(),
-                           tf.local_variables_initializer())
-        sess.run(init_op)
-        coord = tf.train.Coordinator()
-        threads = tf.train.start_queue_runners(coord=coord)
+        sess.run(tf.global_variables_initializer())
         saver = tf.train.Saver()
         saver.restore(sess, tf.train.latest_checkpoint(config.save_dir))
         sess.run(tf.assign(model.is_train, tf.constant(False, dtype=tf.bool)))
@@ -123,8 +125,6 @@ def test(config):
             answer_dict.update(convert_tokens(
                 eval_file, qa_id.tolist(), yp1.tolist(), yp2.tolist()))
             losses.append(loss)
-        coord.request_stop()
-        coord.join(threads)
         loss = np.mean(losses)
         metrics = evaluate(eval_file, answer_dict)
         print("Exact Match: {}, F1: {}".format(

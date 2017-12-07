@@ -4,7 +4,7 @@ from func import stacked_gru, pointer, dot_attention, summ, dropout
 
 
 class Model(object):
-    def __init__(self, config, batch, word_mat=None, char_mat=None, trainable=True):
+    def __init__(self, config, batch, word_mat=None, char_mat=None, trainable=True, opt=True):
         self.config = config
         self.global_step = tf.get_variable('global_step', shape=[], dtype=tf.int32,
                                            initializer=tf.constant_initializer(0), trainable=False)
@@ -34,7 +34,7 @@ class Model(object):
             self.y1 = tf.slice(self.y1, [0, 0], [N, self.c_maxlen])
             self.y2 = tf.slice(self.y2, [0, 0], [N, self.c_maxlen])
         else:
-            self.c_maxlen. self.q_maxlen = config.para_limit, config.ques_limit
+            self.c_maxlen, self.q_maxlen = config.para_limit, config.ques_limit
 
         self.ch_len = tf.reshape(tf.reduce_sum(
             tf.cast(tf.cast(self.ch, tf.bool), tf.int32), axis=2), [-1])
