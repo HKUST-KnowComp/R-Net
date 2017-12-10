@@ -1,10 +1,10 @@
 import tensorflow as tf
-from tensorflow.python.ops.rnn_cell import GRUCell
+from tensorflow.python.ops.rnn_cell_impl import _Linear, RNNCell
 
 INF = 1e30
 
 
-def stacked_gru(inputs, hidden, num_layers, seq_len, batch=None, keep_prob=1.0, is_train=None, std=0.01, concat_layers=True, dtype=tf.float32, scope="StackedGRU"):
+def stacked_gru(inputs, hidden, num_layers, seq_len, batch=None, keep_prob=1.0, is_train=None, std=0.01, concat_layers=True, scope="StackedGRU"):
     with tf.variable_scope(scope):
         outputs = [inputs]
         for layer in range(num_layers):
@@ -43,15 +43,14 @@ def stacked_gru(inputs, hidden, num_layers, seq_len, batch=None, keep_prob=1.0, 
 
 
 def dropout(args, keep_prob, is_train, mode="recurrent"):
-    if keep_prob < 1.0:
-        noise_shape = None
-        shape = tf.shape(args)
-        if mode == "embedding":
-            noise_shape = [shape[0], 1]
-        if mode == "recurrent" and len(args.get_shape().as_list()) == 3:
-            noise_shape = [shape[0], 1, shape[-1]]
-        args = tf.cond(is_train, lambda: tf.nn.dropout(
-            args, keep_prob, noise_shape=noise_shape), lambda: args)
+    noise_shape = None
+    shape = tf.shape(args)
+    if mode == "embedding":
+        noise_shape = [shape[0], 1]
+    if mode == "recurrent" and len(args.get_shape().as_list()) == 3:
+        noise_shape = [shape[0], 1, shape[-1]]
+    args = tf.cond(is_train, lambda: tf.nn.dropout(
+        args, keep_prob, noise_shape=noise_shape), lambda: args)
     return args
 
 
@@ -59,12 +58,10 @@ def softmax_mask(val, mask):
     return -INF * (1 - tf.cast(mask, tf.float32)) + val
 
 
-def pointer(inputs, state, hidden, mask, keep_prob=1.0, is_train=None, scope="pointer"):
+def pointer(inputs, state, hidden, mask, scope="pointer"):
     with tf.variable_scope(scope):
-        d_inputs = dropout(inputs, keep_prob=keep_prob, is_train=is_train)
-        d_state = dropout(state, keep_prob=keep_prob, is_train=is_train)
-        u = tf.concat([tf.tile(tf.expand_dims(d_state, axis=1), [
-            1, tf.shape(d_inputs)[1], 1]), d_inputs], axis=2)
+        u = tf.concat([tf.tile(tf.expand_dims(state, axis=1), [
+            1, tf.shape(inputs)[1], 1]), inputs], axis=2)
         s0 = tf.nn.tanh(dense(u, hidden, use_bias=False, scope="s0"))
         s = dense(s0, 1, use_bias=False, scope="s")
         s1 = softmax_mask(tf.squeeze(s, [2]), mask)
@@ -80,7 +77,7 @@ def summ(memory, hidden, mask, keep_prob=1.0, is_train=None, scope="summ"):
         s = dense(s0, 1, use_bias=False, scope="s")
         s1 = softmax_mask(tf.squeeze(s, [2]), mask)
         a = tf.expand_dims(tf.nn.softmax(s1), axis=2)
-        res = tf.reduce_sum(a * memory, axis=1)
+        res = tf.reduce_sum(a * d_memory, axis=1)
         return res
 
 
@@ -121,3 +118,37 @@ def dense(inputs, hidden, use_bias=True, scope="dense"):
             res = tf.nn.bias_add(res, b)
         res = tf.reshape(res, out_shape)
         return res
+
+
+class GRUCell(RNNCell):
+
+    def __init__(self, num_units, reuse=None):
+        super(GRUCell, self).__init__(_reuse=reuse)
+        self._num_units = num_units
+        self._gate_linear = None
+        self._candidate_linear = None
+
+    @property
+    def state_size(self):
+        return self._num_units
+
+    @property
+    def output_size(self):
+        return self._num_units
+
+    def call(self, inputs, state):
+        if self._gate_linear is None:
+            with tf.variable_scope("gates"):
+                self._gate_linear = _Linear([inputs, state], 2 * self._num_units, True,
+                                            kernel_initializer=tf.orthogonal_initializer(1.0), bias_initializer=tf.constant_initializer(1.0))
+        value = tf.sigmoid(self._gate_linear([inputs, state]))
+        r, u = tf.split(value=value, num_or_size_splits=2, axis=1)
+
+        r_state = r * state
+        if self._candidate_linear is None:
+            with tf.variable_scope("candidate"):
+                self._candidate_linear = _Linear([inputs, r_state], self._num_units, True, kernel_initializer=tf.orthogonal_initializer(
+                    1.0), bias_initializer=tf.constant_initializer(-1.0))
+        c = tf.nn.tanh(self._candidate_linear([inputs, r_state]))
+        new_h = u * state + (1 - u) * c
+        return new_h, new_h

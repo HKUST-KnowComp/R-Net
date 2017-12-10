@@ -72,17 +72,19 @@ flags.DEFINE_integer("char_count_limit", -1, "Min count for char")
 
 flags.DEFINE_integer("capacity", 15000, "Batch size of dataset shuffle")
 
-flags.DEFINE_integer("batch_size", 32, "Batch size")
+flags.DEFINE_integer("batch_size", 64, "Batch size")
 flags.DEFINE_integer("num_steps", 50000, "Number of steps")
 flags.DEFINE_integer("checkpoint", 1000,
                      "checkpoint to save and evaluate the model")
 flags.DEFINE_integer("period", 100, "period to save batch loss")
 flags.DEFINE_integer("val_num_batches", 300,
                      "Number of batches to evaluate the model")
-flags.DEFINE_float("init_lr", 0.001, "Initial learning rate for Adam")
-flags.DEFINE_float("keep_prob", 0.7, "Dropout keep prob between layers")
+flags.DEFINE_float("init_lr", 0.5, "Initial learning rate for Adam")
+flags.DEFINE_float("keep_prob", 0.7, "Dropout keep prob in rnn")
 flags.DEFINE_float("emb_keep_prob", 0.925,
                    "Dropout keep prob for embedding layers")
+flags.DEFINE_float("ptr_keep_prob", 0.8,
+                   "Dropout keep prob for pointer network")
 flags.DEFINE_float("grad_clip", 10.0, "Global Norm gradient clipping rate")
 flags.DEFINE_integer("hidden", 75, "Hidden size")
 flags.DEFINE_integer("char_hidden", 100, "GRU dimention for char")
