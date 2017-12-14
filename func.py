@@ -1,10 +1,10 @@
 import tensorflow as tf
-from tensorflow.python.ops.rnn_cell_impl import _Linear, RNNCell
+from tensorflow.python.ops.rnn_cell import GRUCell
 
 INF = 1e30
 
 
-def stacked_gru(inputs, hidden, num_layers, seq_len, batch=None, keep_prob=1.0, is_train=None, std=0.01, concat_layers=True, scope="StackedGRU"):
+def stacked_gru(inputs, hidden, num_layers, seq_len, keep_prob=1.0, is_train=None, concat_layers=True, scope="StackedGRU"):
     with tf.variable_scope(scope):
         outputs = [inputs]
         for layer in range(num_layers):
@@ -13,24 +13,16 @@ def stacked_gru(inputs, hidden, num_layers, seq_len, batch=None, keep_prob=1.0, 
                     inputs_fw = dropout(
                         outputs[-1], keep_prob=keep_prob, is_train=is_train)
                     cell_fw = GRUCell(hidden)
-                    init_fw = None
-                    if batch is not None:
-                        init_fw = tf.tile(tf.get_variable("init_fw", [
-                                          1, hidden], initializer=tf.truncated_normal_initializer(stddev=std)), [batch, 1])
                     out_fw, state_fw = tf.nn.dynamic_rnn(
-                        cell_fw, inputs_fw, sequence_length=seq_len, initial_state=init_fw, dtype=tf.float32)
+                        cell_fw, inputs_fw, sequence_length=seq_len, dtype=tf.float32)
                 with tf.variable_scope("bw"):
                     _inputs_bw = tf.reverse_sequence(
                         outputs[-1], seq_lengths=seq_len, seq_dim=1, batch_dim=0)
                     inputs_bw = dropout(
                         _inputs_bw, keep_prob=keep_prob, is_train=is_train)
                     cell_bw = GRUCell(hidden)
-                    init_bw = None
-                    if batch is not None:
-                        init_bw = tf.tile(tf.get_variable("init_bw", [
-                                          1, hidden], initializer=tf.truncated_normal_initializer(stddev=std)), [batch, 1])
                     out_bw, state_bw = tf.nn.dynamic_rnn(
-                        cell_bw, inputs_bw, sequence_length=seq_len, initial_state=init_bw, dtype=tf.float32)
+                        cell_bw, inputs_bw, sequence_length=seq_len, dtype=tf.float32)
                     out_bw = tf.reverse_sequence(
                         out_bw, seq_lengths=seq_len, seq_dim=1, batch_dim=0)
                 outputs.append(tf.concat([out_fw, out_bw], axis=2))
@@ -118,37 +110,3 @@ def dense(inputs, hidden, use_bias=True, scope="dense"):
             res = tf.nn.bias_add(res, b)
         res = tf.reshape(res, out_shape)
         return res
-
-
-class GRUCell(RNNCell):
-
-    def __init__(self, num_units, reuse=None):
-        super(GRUCell, self).__init__(_reuse=reuse)
-        self._num_units = num_units
-        self._gate_linear = None
-        self._candidate_linear = None
-
-    @property
-    def state_size(self):
-        return self._num_units
-
-    @property
-    def output_size(self):
-        return self._num_units
-
-    def call(self, inputs, state):
-        if self._gate_linear is None:
-            with tf.variable_scope("gates"):
-                self._gate_linear = _Linear([inputs, state], 2 * self._num_units, True,
-                                            kernel_initializer=tf.orthogonal_initializer(1.0), bias_initializer=tf.constant_initializer(1.0))
-        value = tf.sigmoid(self._gate_linear([inputs, state]))
-        r, u = tf.split(value=value, num_or_size_splits=2, axis=1)
-
-        r_state = r * state
-        if self._candidate_linear is None:
-            with tf.variable_scope("candidate"):
-                self._candidate_linear = _Linear([inputs, r_state], self._num_units, True, kernel_initializer=tf.orthogonal_initializer(
-                    1.0), bias_initializer=tf.constant_initializer(-1.0))
-        c = tf.nn.tanh(self._candidate_linear([inputs, r_state]))
-        new_h = u * state + (1 - u) * c
-        return new_h, new_h
