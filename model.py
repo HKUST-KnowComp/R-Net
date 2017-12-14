@@ -87,10 +87,10 @@ class Model(object):
             q_emb = tf.concat([q_emb, qh_emb], axis=2)
 
         with tf.variable_scope("encoding"):
-            c, _ = stacked_gru(c_emb, d, batch=N, num_layers=3, seq_len=self.c_len, keep_prob=self.keep_prob,
+            c, _ = stacked_gru(c_emb, d, num_layers=3, seq_len=self.c_len, keep_prob=self.keep_prob,
                                is_train=self.is_train)
             tf.get_variable_scope().reuse_variables()
-            q, _ = stacked_gru(q_emb, d, batch=N, num_layers=3, seq_len=self.q_len, keep_prob=self.keep_prob,
+            q, _ = stacked_gru(q_emb, d, num_layers=3, seq_len=self.q_len, keep_prob=self.keep_prob,
                                is_train=self.is_train)
 
         with tf.variable_scope("attention"):
