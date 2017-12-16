@@ -34,7 +34,7 @@ The default directory for tensorboard log file is `log/event`
 
 ## Detailed Implementaion
 
-  * The original paper uses additive attention, which consumes lots of memory. This project adopts symmetric-form attention presented in  Fusion Net: [Fusing Via Fully-aware Attention With Application To Machine Comprehension](https://openreview.net/pdf?id=BJIgi_eCZ).
+  * The original paper uses additive attention, which consumes lots of memory. This project adopts symmetric-form attention presented in [Fusion Net: Fusing via Fully-aware Attention with Application to Machine Comprehension](https://openreview.net/pdf?id=BJIgi_eCZ).
   * This project adopts variational dropout presented in [A Theoretically Grounded Application of Dropout in Recurrent Neural Networks](https://arxiv.org/pdf/1512.05287.pdf).
   * To solve the degradation problem in stacked RNN, outputs of each layer are concatenated to produce the final output.
   * When the loss on dev set increases in a certain period, the learning rate is halved.
