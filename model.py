@@ -9,18 +9,16 @@ class Model(object):
         self.global_step = tf.get_variable('global_step', shape=[], dtype=tf.int32,
                                            initializer=tf.constant_initializer(0), trainable=False)
         self.c, self.q, self.ch, self.qh, self.y1, self.y2, self.qa_id = batch.get_next()
-        self.emb_keep_prob = tf.get_variable("emb_keep_prob", shape=[
-        ], dtype=tf.float32, trainable=False, initializer=tf.constant_initializer(config.emb_keep_prob))
         self.keep_prob = tf.get_variable("keep_prob", shape=[
         ], dtype=tf.float32, trainable=False, initializer=tf.constant_initializer(config.keep_prob))
         self.ptr_keep_prob = tf.get_variable("ptr_keep_prob", shape=[
         ], dtype=tf.float32, trainable=False, initializer=tf.constant_initializer(config.ptr_keep_prob))
         self.is_train = tf.get_variable(
             "is_train", shape=[], dtype=tf.bool, trainable=False)
-        self.word_mat = dropout(tf.get_variable("word_mat", initializer=tf.constant(
-            word_mat, dtype=tf.float32), trainable=False), keep_prob=self.emb_keep_prob, is_train=self.is_train, mode="embedding")
-        self.char_mat = dropout(tf.get_variable("char_mat", initializer=tf.constant(
-            char_mat, dtype=tf.float32)), keep_prob=self.emb_keep_prob, is_train=self.is_train, mode="embedding")
+        self.word_mat = tf.get_variable("word_mat", initializer=tf.constant(
+            word_mat, dtype=tf.float32), trainable=False)
+        self.char_mat = tf.get_variable(
+            "char_mat", char_mat.shape, dtype=tf.float32)
 
         self.c_mask = tf.cast(self.c, tf.bool)
         self.q_mask = tf.cast(self.q, tf.bool)

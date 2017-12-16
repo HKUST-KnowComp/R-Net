@@ -80,11 +80,14 @@ def dot_attention(inputs, memory, mask, hidden, keep_prob=1.0, is_train=None, sc
         d_memory = dropout(memory, keep_prob=keep_prob, is_train=is_train)
 
         JX = tf.shape(inputs)[1]
-        inputs_ = tf.nn.relu(dense(d_inputs, hidden, scope="inputs"))
-        memory_ = tf.nn.relu(dense(d_memory, hidden, scope="memory"))
+        inputs_ = tf.nn.relu(
+            dense(d_inputs, hidden, use_bias=False, scope="inputs"))
+        memory_ = tf.nn.relu(
+            dense(d_memory, hidden, use_bias=False, scope="memory"))
+        scale = tf.get_variable(
+            "scale", [hidden], initializer=tf.constant_initializer(hidden ** 0.5))
 
-        outputs = tf.matmul(inputs_, tf.transpose(
-            memory_, [0, 2, 1])) / (hidden ** 0.5)
+        outputs = tf.matmul(inputs_ * scale, tf.transpose(memory_, [0, 2, 1]))
         mask = tf.tile(tf.expand_dims(mask, axis=1), [1, JX, 1])
         logits = tf.nn.softmax(softmax_mask(outputs, mask))
         outputs = tf.matmul(logits, memory)
