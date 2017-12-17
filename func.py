@@ -85,7 +85,7 @@ def dot_attention(inputs, memory, mask, hidden, keep_prob=1.0, is_train=None, sc
         memory_ = tf.nn.relu(
             dense(d_memory, hidden, use_bias=False, scope="memory"))
         scale = tf.get_variable(
-            "scale", [hidden], initializer=tf.constant_initializer(hidden ** 0.5))
+            "scale", [hidden], initializer=tf.constant_initializer(hidden**-0.5))
 
         outputs = tf.matmul(inputs_ * scale, tf.transpose(memory_, [0, 2, 1]))
         mask = tf.tile(tf.expand_dims(mask, axis=1), [1, JX, 1])
