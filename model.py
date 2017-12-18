@@ -121,19 +121,19 @@ class Model(object):
                 _, state = cell_bw(inp, init)
                 tf.get_variable_scope().reuse_variables()
                 _, logits1_bw = pointer(d_match, state, d, mask=self.c_mask)
-            logits1 = (logits1_fw + logits1_bw) / 2.
-            logits2 = (logits2_fw + logits2_bw) / 2.
+            logits1 = (tf.nn.softmax(logits1_fw) +
+                       tf.nn.softmax(logits1_bw)) / 2.
+            logits2 = (tf.nn.softmax(logits2_fw) +
+                       tf.nn.softmax(logits2_bw)) / 2.
 
         with tf.variable_scope("predict"):
-            outer = tf.matmul(tf.expand_dims(tf.nn.softmax(logits1), axis=2),
-                              tf.expand_dims(tf.nn.softmax(logits2), axis=1))
+            outer = tf.matmul(tf.expand_dims(logits1, axis=2),
+                              tf.expand_dims(logits2, axis=1))
             outer = tf.matrix_band_part(outer, 0, 15)
             self.yp1 = tf.argmax(tf.reduce_max(outer, axis=2), axis=1)
             self.yp2 = tf.argmax(tf.reduce_max(outer, axis=1), axis=1)
-            losses = tf.nn.softmax_cross_entropy_with_logits(
-                logits=logits1, labels=self.y1)
-            losses2 = tf.nn.softmax_cross_entropy_with_logits(
-                logits=logits2, labels=self.y2)
+            losses = -tf.reduce_sum(self.y1 * tf.log(logits1 + 1e-5), axis=1)
+            losses2 = -tf.reduce_sum(self.y2 * tf.log(logits2 + 1e-5), axis=1)
             self.loss = tf.reduce_mean(losses + losses2)
 
     def get_loss(self):
