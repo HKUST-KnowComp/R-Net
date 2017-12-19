@@ -50,12 +50,10 @@ def softmax_mask(val, mask):
     return -INF * (1 - tf.cast(mask, tf.float32)) + val
 
 
-def pointer(inputs, state, hidden, mask, keep_prob=1.0, is_train=None, scope="pointer"):
+def pointer(inputs, state, hidden, mask, scope="pointer"):
     with tf.variable_scope(scope):
-        d_inputs = dropout(inputs, keep_prob=keep_prob, is_train=is_train)
-        d_state = dropout(state, keep_prob=keep_prob, is_train=is_train)
-        u = tf.concat([tf.tile(tf.expand_dims(d_state, axis=1), [
-            1, tf.shape(inputs)[1], 1]), d_inputs], axis=2)
+        u = tf.concat([tf.tile(tf.expand_dims(state, axis=1), [
+            1, tf.shape(inputs)[1], 1]), inputs], axis=2)
         s0 = tf.nn.tanh(dense(u, hidden, use_bias=False, scope="s0"))
         s = dense(s0, 1, use_bias=False, scope="s")
         s1 = softmax_mask(tf.squeeze(s, [2]), mask)
@@ -71,7 +69,7 @@ def summ(memory, hidden, mask, keep_prob=1.0, is_train=None, scope="summ"):
         s = dense(s0, 1, use_bias=False, scope="s")
         s1 = softmax_mask(tf.squeeze(s, [2]), mask)
         a = tf.expand_dims(tf.nn.softmax(s1), axis=2)
-        res = tf.reduce_sum(a * memory, axis=1)
+        res = tf.reduce_sum(a * d_memory, axis=1)
         return res
 
 
@@ -83,9 +81,13 @@ def dot_attention(inputs, memory, mask, hidden, keep_prob=1.0, is_train=None, sc
         JX = tf.shape(inputs)[1]
 
         with tf.variable_scope("attention"):
-            inputs_ = tf.nn.relu(dense(d_inputs, hidden, scope="inputs"))
-            memory_ = tf.nn.relu(dense(d_memory, hidden, scope="memory"))
-            outputs = tf.matmul(inputs_, tf.transpose(memory_, [0, 2, 1]))
+            scale = tf.get_variable(
+                "scale", [hidden], initializer=tf.constant_initializer(hidden**-0.5))
+            inputs_ = tf.nn.relu(dense(d_inputs, hidden, use_bias=False))
+            tf.get_variable_scope().reuse_variables()
+            memory_ = tf.nn.relu(dense(d_memory, hidden, use_bias=False))
+            outputs = tf.matmul(
+                inputs_ * scale, tf.transpose(memory_, [0, 2, 1]))
             mask = tf.tile(tf.expand_dims(mask, axis=1), [1, JX, 1])
             logits = tf.nn.softmax(softmax_mask(outputs, mask))
             outputs = tf.matmul(logits, memory)
