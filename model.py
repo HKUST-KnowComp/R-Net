@@ -1,6 +1,6 @@
 import tensorflow as tf
 from tensorflow.python.ops.rnn_cell import GRUCell
-from func import stacked_gru, pointer, dot_attention, summ, dropout
+from func import stacked_gru, pointer, dot_attention, summ
 
 
 class Model(object):
@@ -106,21 +106,23 @@ class Model(object):
         with tf.variable_scope("pointer"):
             init = summ(q[:, :, -2 * d:], d, mask=self.q_mask,
                         keep_prob=self.ptr_keep_prob, is_train=self.is_train)
-            d_match = dropout(
-                match, keep_prob=self.ptr_keep_prob, is_train=self.is_train)
             hidden = init.get_shape().as_list()[-1]
             cell_fw = GRUCell(hidden)
             cell_bw = GRUCell(hidden)
             with tf.variable_scope("fw"):
-                inp, logits1_fw = pointer(d_match, init, d, mask=self.c_mask)
+                inp, logits1_fw = pointer(
+                    match, init, d, self.c_mask, keep_prob=self.ptr_keep_prob, is_train=self.is_train)
                 _, state = cell_fw(inp, init)
                 tf.get_variable_scope().reuse_variables()
-                _, logits2_fw = pointer(d_match, state, d, mask=self.c_mask)
+                _, logits2_fw = pointer(
+                    match, state, d, self.c_mask, keep_prob=self.ptr_keep_prob, is_train=self.is_train)
             with tf.variable_scope("bw"):
-                inp, logits2_bw = pointer(d_match, init, d, mask=self.c_mask)
+                inp, logits2_bw = pointer(
+                    match, init, d, self.c_mask, keep_prob=self.ptr_keep_prob, is_train=self.is_train)
                 _, state = cell_bw(inp, init)
                 tf.get_variable_scope().reuse_variables()
-                _, logits1_bw = pointer(d_match, state, d, mask=self.c_mask)
+                _, logits1_bw = pointer(
+                    match, state, d, self.c_mask, keep_prob=self.ptr_keep_prob, is_train=self.is_train)
             logits1 = (tf.nn.softmax(logits1_fw) +
                        tf.nn.softmax(logits1_bw)) / 2.
             logits2 = (tf.nn.softmax(logits2_fw) +
