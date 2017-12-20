@@ -81,8 +81,10 @@ def dot_attention(inputs, memory, mask, hidden, keep_prob=1.0, is_train=None, sc
         JX = tf.shape(inputs)[1]
 
         with tf.variable_scope("attention"):
-            inputs_ = tf.nn.relu(dense(d_inputs, hidden, use_bias=False))
-            memory_ = tf.nn.relu(dense(d_memory, hidden, use_bias=False))
+            inputs_ = tf.nn.relu(
+                dense(d_inputs, hidden, use_bias=False, scope="inputs"))
+            memory_ = tf.nn.relu(
+                dense(d_memory, hidden, use_bias=False, scope="memory"))
             outputs = tf.matmul(inputs_, tf.transpose(
                 memory_, [0, 2, 1])) / (hidden ** 0.5)
             mask = tf.tile(tf.expand_dims(mask, axis=1), [1, JX, 1])
