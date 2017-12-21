@@ -72,6 +72,8 @@ flags.DEFINE_integer("char_count_limit", -1, "Min count for char")
 
 flags.DEFINE_integer("capacity", 15000, "Batch size of dataset shuffle")
 
+flags.DEFINE_integer("is_bucket", True, "build bucket batch iterator or not")
+flags.DEFINE_integer("bucket_range", [40, 401, 40], "the range of bucket")
 flags.DEFINE_integer("batch_size", 64, "Batch size")
 flags.DEFINE_integer("num_steps", 60000, "Number of steps")
 flags.DEFINE_integer("checkpoint", 1000,

@@ -8,7 +8,7 @@ class Model(object):
         self.config = config
         self.global_step = tf.get_variable('global_step', shape=[], dtype=tf.int32,
                                            initializer=tf.constant_initializer(0), trainable=False)
-        self.c, self.q, self.ch, self.qh, self.y1, self.y2, self.qa_id = batch.get_next()
+        self.c, self.q, self.ch, self.qh, self.y1, self.y2, self.qa_id, _ = batch.get_next()
         self.keep_prob = tf.get_variable("keep_prob", shape=[
         ], dtype=tf.float32, trainable=False, initializer=tf.constant_initializer(config.keep_prob))
         self.ptr_keep_prob = tf.get_variable("ptr_keep_prob", shape=[
