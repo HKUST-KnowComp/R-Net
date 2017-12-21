@@ -81,8 +81,6 @@ flags.DEFINE_integer("val_num_batches", 150,
                      "Number of batches to evaluate the model")
 flags.DEFINE_float("init_lr", 0.5, "Initial learning rate for Adadelta")
 flags.DEFINE_float("keep_prob", 0.7, "Dropout keep prob in rnn")
-flags.DEFINE_float("emb_keep_prob", 0.925,
-                   "Dropout keep prob for embedding layers")
 flags.DEFINE_float("ptr_keep_prob", 0.7,
                    "Dropout keep prob for pointer network")
 flags.DEFINE_float("grad_clip", 10.0, "Global Norm gradient clipping rate")

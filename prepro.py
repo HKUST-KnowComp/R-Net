@@ -98,8 +98,7 @@ def get_embedding(counter, data_type, limit=-1, emb_file=None, size=None, vec_si
     else:
         assert vec_size is not None
         for token in filtered_elements:
-            embedding_dict[token] = [np.random.uniform(
-                low=-3**0.5, high=3**0.5) for _ in range(vec_size)]
+            embedding_dict[token] = [0. for _ in range(vec_size)]
         print("{} tokens have corresponding embedding vector".format(
             len(filtered_elements)))
     NULL = "--NULL--"

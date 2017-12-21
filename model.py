@@ -9,18 +9,16 @@ class Model(object):
         self.global_step = tf.get_variable('global_step', shape=[], dtype=tf.int32,
                                            initializer=tf.constant_initializer(0), trainable=False)
         self.c, self.q, self.ch, self.qh, self.y1, self.y2, self.qa_id = batch.get_next()
-        self.emb_keep_prob = tf.get_variable("emb_keep_prob", shape=[
-        ], dtype=tf.float32, trainable=False, initializer=tf.constant_initializer(config.emb_keep_prob))
         self.keep_prob = tf.get_variable("keep_prob", shape=[
         ], dtype=tf.float32, trainable=False, initializer=tf.constant_initializer(config.keep_prob))
         self.ptr_keep_prob = tf.get_variable("ptr_keep_prob", shape=[
         ], dtype=tf.float32, trainable=False, initializer=tf.constant_initializer(config.ptr_keep_prob))
         self.is_train = tf.get_variable(
             "is_train", shape=[], dtype=tf.bool, trainable=False)
-        self.word_mat = dropout(tf.get_variable("word_mat", initializer=tf.constant(
-            word_mat, dtype=tf.float32), trainable=False), keep_prob=self.emb_keep_prob, is_train=self.is_train, mode="embedding")
-        self.char_mat = dropout(tf.get_variable("char_mat", initializer=tf.constant(
-            char_mat, dtype=tf.float32)), keep_prob=self.emb_keep_prob, is_train=self.is_train, mode="embedding")
+        self.word_mat = tf.get_variable("word_mat", initializer=tf.constant(
+            word_mat, dtype=tf.float32), trainable=False)
+        self.char_mat = tf.get_variable(
+            "char_mat", char_mat.shape, dtype=tf.float32)
 
         self.c_mask = tf.cast(self.c, tf.bool)
         self.q_mask = tf.cast(self.q, tf.bool)
@@ -123,19 +121,19 @@ class Model(object):
                 _, state = cell_bw(inp, init)
                 tf.get_variable_scope().reuse_variables()
                 _, logits1_bw = pointer(d_match, state, d, mask=self.c_mask)
-            logits1 = (logits1_fw + logits1_bw) / 2.
-            logits2 = (logits2_fw + logits2_bw) / 2.
+            logits1 = (tf.nn.softmax(logits1_fw) +
+                       tf.nn.softmax(logits1_bw)) / 2.
+            logits2 = (tf.nn.softmax(logits2_fw) +
+                       tf.nn.softmax(logits2_bw)) / 2.
 
         with tf.variable_scope("predict"):
-            outer = tf.matmul(tf.expand_dims(tf.nn.softmax(logits1), axis=2),
-                              tf.expand_dims(tf.nn.softmax(logits2), axis=1))
+            outer = tf.matmul(tf.expand_dims(logits1, axis=2),
+                              tf.expand_dims(logits2, axis=1))
             outer = tf.matrix_band_part(outer, 0, 15)
             self.yp1 = tf.argmax(tf.reduce_max(outer, axis=2), axis=1)
             self.yp2 = tf.argmax(tf.reduce_max(outer, axis=1), axis=1)
-            losses = tf.nn.softmax_cross_entropy_with_logits(
-                logits=logits1, labels=self.y1)
-            losses2 = tf.nn.softmax_cross_entropy_with_logits(
-                logits=logits2, labels=self.y2)
+            losses = -tf.reduce_sum(self.y1 * tf.log(logits1 + 1e-5), axis=1)
+            losses2 = -tf.reduce_sum(self.y2 * tf.log(logits2 + 1e-5), axis=1)
             self.loss = tf.reduce_mean(losses + losses2)
 
     def get_loss(self):

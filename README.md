@@ -17,7 +17,9 @@ SELF-MATCHING NETWORKS](https://www.microsoft.com/en-us/research/wp-content/uplo
 To download and preprocess the data, use
 
 ```bash
+# download SQuAD and Glove
 sh download.sh
+# preprocess the data
 python config.py --mode prepro
 ```
 
@@ -32,8 +34,8 @@ The default directory for tensorboard log file is `log/event`
 
 ## Detailed Implementaion
 
-  * The original paper uses additive attention, which consumes lots of memory. This project adopts scaled dot attention presented in [Attention Is All You Need](https://arxiv.org/pdf/1706.03762.pdf)
-  * This project adopts sequence-level dropout and embedding dropout presented in [A Theoretically Grounded Application of Dropout in Recurrent Neural Networks](https://arxiv.org/pdf/1512.05287.pdf).
+  * The original paper uses additive attention, which consumes lots of memory. This project adopts symmetric-form attention presented in [Fusion Net: Fusing via Fully-aware Attention with Application to Machine Comprehension](https://openreview.net/pdf?id=BJIgi_eCZ).
+  * This project adopts variational dropout presented in [A Theoretically Grounded Application of Dropout in Recurrent Neural Networks](https://arxiv.org/pdf/1512.05287.pdf).
   * To solve the degradation problem in stacked RNN, outputs of each layer are concatenated to produce the final output.
   * When the loss on dev set increases in a certain period, the learning rate is halved.
   * During prediction, the project adopts search method and bidirectional answer pointer presented in [Machine Comprehension Using Match-LSTM and Answer Pointer](https://arxiv.org/pdf/1608.07905.pdf).
