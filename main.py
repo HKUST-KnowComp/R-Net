@@ -5,7 +5,7 @@ from tqdm import tqdm
 import os
 
 from model import Model
-from util import get_record_parser, convert_tokens, evaluate
+from util import get_record_parser, convert_tokens, evaluate, get_batch_iterator
 
 
 def train(config, load=False):
@@ -24,10 +24,10 @@ def train(config, load=False):
 
     print("Building model...")
     parser = get_record_parser(config)
-    train_batch = tf.data.TFRecordDataset(config.train_record_file).map(parser).shuffle(
-        config.capacity).repeat().batch(config.batch_size).make_one_shot_iterator()
-    dev_batch = tf.data.TFRecordDataset(config.dev_record_file).map(
-        parser).repeat().batch(config.batch_size).make_one_shot_iterator()
+
+    train_batch = get_batch_iterator(config.train_record_file, parser, config)
+    dev_batch = get_batch_iterator(config.dev_record_file, parser, config)
+
     with tf.variable_scope("model"):
         model_train = Model(config, train_batch, word_mat, char_mat)
         tf.get_variable_scope().reuse_variables()
@@ -104,8 +104,7 @@ def test(config):
     total = meta["total"]
 
     print("Loading model...")
-    test_batch = tf.data.TFRecordDataset(config.test_record_file).map(
-        get_record_parser(config)).batch(config.batch_size).make_one_shot_iterator()
+    test_batch = get_batch_iterator(config.test_record_file, get_record_parser(config), config)
     with tf.variable_scope("model"):
         model = Model(config, test_batch, word_mat, char_mat, trainable=False)
 

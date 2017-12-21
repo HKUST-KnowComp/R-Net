@@ -4,6 +4,31 @@ from collections import Counter
 import string
 
 
+def get_batch_iterator(record_file, parser, config):
+    if config.is_bucket:
+        print("Building bucket batch iterator... from: %s" % record_file)
+        buckets = [tf.constant(num) for num in range(*config.bucket_range)]
+
+        def key_func(context_idxs, ques_idxs, context_char_idxs, ques_char_idxs, y1, y2, qa_id, c_len):
+            t = tf.clip_by_value(buckets, 0, c_len)
+            return tf.argmax(t)
+
+        def reduce_func(key, elements):
+            return elements.apply(tf.contrib.data.batch_and_drop_remainder(config.batch_size))
+
+        # the first shuffle makes the bucket inside to be random
+        # the second shuffle select bucket randomly
+        batch_iter = tf.data.TFRecordDataset(record_file).map(parser).shuffle(config.capacity) \
+            .apply(tf.contrib.data.group_by_window(key_func, reduce_func, window_size=config.capacity)) \
+            .shuffle(len(buckets)).repeat().make_one_shot_iterator()
+    else:
+        print("Building batch iterator... from: %s" % record_file)
+        batch_iter = tf.data.TFRecordDataset(record_file).map(parser).shuffle(
+            config.capacity).repeat().batch(config.batch_size).make_one_shot_iterator()
+
+    return batch_iter
+
+
 def get_record_parser(config):
     def parse(example):
         para_limit = config.para_limit
@@ -32,7 +57,12 @@ def get_record_parser(config):
         y2 = tf.reshape(tf.decode_raw(
             features["y2"], tf.float32), [para_limit])
         qa_id = features["id"]
-        return context_idxs, ques_idxs, context_char_idxs, ques_char_idxs, y1, y2, qa_id
+
+        c = tf.cast(context_idxs, tf.bool)
+        c_len = tf.reduce_sum(tf.cast(c, tf.int32))
+
+        return context_idxs, ques_idxs, context_char_idxs, ques_char_idxs, y1, y2, qa_id, c_len
+
     return parse
 
 
@@ -63,7 +93,6 @@ def evaluate(eval_file, answer_dict):
 
 
 def normalize_answer(s):
-
     def remove_articles(text):
         return re.sub(r'\b(a|an|the)\b', ' ', text)
 
