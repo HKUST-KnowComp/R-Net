@@ -73,7 +73,7 @@ def process_file(filename, data_type, word_counter, char_counter):
                                "ques_chars": ques_chars, "y1s": y1s, "y2s": y2s, "id": total}
                     examples.append(example)
                     eval_examples[str(total)] = {
-                        "context": context, "spans": spans, "answers": answer_texts}
+                        "context": context, "spans": spans, "answers": answer_texts, "uuid": qa["id"]}
         random.shuffle(examples)
         print("{} questions in total".format(len(examples)))
     return examples, eval_examples
@@ -115,11 +115,15 @@ def get_embedding(counter, data_type, limit=-1, emb_file=None, size=None, vec_si
     return emb_mat, token2idx_dict
 
 
-def filter_func(config, example):
-    return len(example["context_tokens"]) > config.para_limit or len(example["ques_tokens"]) > config.ques_limit
+def build_features(config, examples, data_type, out_file, word2idx_dict, char2idx_dict, is_test=False):
 
+    para_limit = config.test_para_limit if is_test else config.para_limit
+    ques_limit = config.test_ques_limit if is_test else config.ques_limit
+    char_limit = config.char_limit
 
-def build_features(config, examples, data_type, out_file, word2idx_dict, char2idx_dict, filter_func=None, eval_examples=None):
+    def filter_func(example, is_test=False):
+        return len(example["context_tokens"]) > para_limit or len(example["ques_tokens"]) > ques_limit
+
     print("Processing {} examples...".format(data_type))
     writer = tf.python_io.TFRecordWriter(out_file)
     total = 0
@@ -127,18 +131,17 @@ def build_features(config, examples, data_type, out_file, word2idx_dict, char2id
     meta = {}
     for example in tqdm(examples):
         total_ += 1
-        if filter_func is not None:
-            if filter_func(config, example):
-                continue
+
+        if filter_func(example, is_test):
+            continue
+
         total += 1
-        context_idxs = np.zeros([config.para_limit], dtype=np.int32)
-        context_char_idxs = np.zeros(
-            [config.para_limit, config.char_limit], dtype=np.int32)
-        ques_idxs = np.zeros([config.ques_limit], dtype=np.int32)
-        ques_char_idxs = np.zeros(
-            [config.ques_limit, config.char_limit], dtype=np.int32)
-        y1 = np.zeros([config.para_limit], dtype=np.float32)
-        y2 = np.zeros([config.para_limit], dtype=np.float32)
+        context_idxs = np.zeros([para_limit], dtype=np.int32)
+        context_char_idxs = np.zeros([para_limit, char_limit], dtype=np.int32)
+        ques_idxs = np.zeros([ques_limit], dtype=np.int32)
+        ques_char_idxs = np.zeros([ques_limit, char_limit], dtype=np.int32)
+        y1 = np.zeros([para_limit], dtype=np.float32)
+        y2 = np.zeros([para_limit], dtype=np.float32)
 
         def _get_word(word):
             for each in (word, word.lower(), word.capitalize(), word.upper()):
@@ -159,13 +162,13 @@ def build_features(config, examples, data_type, out_file, word2idx_dict, char2id
 
         for i, token in enumerate(example["context_chars"]):
             for j, char in enumerate(token):
-                if j == config.char_limit:
+                if j == char_limit:
                     break
                 context_char_idxs[i, j] = _get_char(char)
 
         for i, token in enumerate(example["ques_chars"]):
             for j, char in enumerate(token):
-                if j == config.char_limit:
+                if j == char_limit:
                     break
                 ques_char_idxs[i, j] = _get_char(char)
 
@@ -207,12 +210,12 @@ def prepro(config):
         word_counter, "word", emb_file=config.glove_file, size=config.glove_size, vec_size=config.glove_dim)
     char_emb_mat, char2idx_dict = get_embedding(
         char_counter, "char", vec_size=config.char_dim)
-    build_features(config, train_examples, "train", config.train_record_file,
-                   word2idx_dict, char2idx_dict, filter_func=filter_func, eval_examples=train_eval)
-    dev_meta = build_features(config, dev_examples, "dev", config.dev_record_file,
-                              word2idx_dict, char2idx_dict, filter_func=filter_func, eval_examples=dev_eval)
-    test_meta = build_features(config, test_examples, "test", config.test_record_file,
-                               word2idx_dict, char2idx_dict, filter_func=filter_func, eval_examples=test_eval)
+    build_features(config, train_examples, "train",
+                   config.train_record_file, word2idx_dict, char2idx_dict)
+    dev_meta = build_features(config, dev_examples, "dev",
+                              config.dev_record_file, word2idx_dict, char2idx_dict)
+    test_meta = build_features(config, test_examples, "test",
+                               config.test_record_file, word2idx_dict, char2idx_dict, is_test=True)
     save(config.word_emb_file, word_emb_mat, message="word embedding")
     save(config.char_emb_file, char_emb_mat, message="char embedding")
     save(config.train_eval_file, train_eval, message="train eval")

@@ -4,35 +4,10 @@ from collections import Counter
 import string
 
 
-def get_batch_iterator(record_file, parser, config):
-    if config.is_bucket:
-        print("Building bucket batch iterator... from: %s" % record_file)
-        buckets = [tf.constant(num) for num in range(*config.bucket_range)]
-
-        def key_func(context_idxs, ques_idxs, context_char_idxs, ques_char_idxs, y1, y2, qa_id, c_len):
-            t = tf.clip_by_value(buckets, 0, c_len)
-            return tf.argmax(t)
-
-        def reduce_func(key, elements):
-            return elements.apply(tf.contrib.data.batch_and_drop_remainder(config.batch_size))
-
-        # the first shuffle makes the bucket inside to be random
-        # the second shuffle select bucket randomly
-        batch_iter = tf.data.TFRecordDataset(record_file).map(parser).shuffle(config.capacity) \
-            .apply(tf.contrib.data.group_by_window(key_func, reduce_func, window_size=config.capacity)) \
-            .shuffle(len(buckets)).repeat().make_one_shot_iterator()
-    else:
-        print("Building batch iterator... from: %s" % record_file)
-        batch_iter = tf.data.TFRecordDataset(record_file).map(parser).shuffle(
-            config.capacity).repeat().batch(config.batch_size).make_one_shot_iterator()
-
-    return batch_iter
-
-
-def get_record_parser(config):
+def get_record_parser(config, is_test=False):
     def parse(example):
-        para_limit = config.para_limit
-        ques_limit = config.ques_limit
+        para_limit = config.test_para_limit if is_test else config.para_limit
+        ques_limit = config.test_ques_limit if is_test else config.ques_limit
         char_limit = config.char_limit
         features = tf.parse_single_example(example,
                                            features={
@@ -57,24 +32,52 @@ def get_record_parser(config):
         y2 = tf.reshape(tf.decode_raw(
             features["y2"], tf.float32), [para_limit])
         qa_id = features["id"]
-
-        c = tf.cast(context_idxs, tf.bool)
-        c_len = tf.reduce_sum(tf.cast(c, tf.int32))
-
-        return context_idxs, ques_idxs, context_char_idxs, ques_char_idxs, y1, y2, qa_id, c_len
-
+        return context_idxs, ques_idxs, context_char_idxs, ques_char_idxs, y1, y2, qa_id
     return parse
+
+
+def get_batch_dataset(record_file, parser, config):
+    num_threads = tf.constant(config.num_threads, dtype=tf.int32)
+    dataset = tf.data.TFRecordDataset(record_file).map(
+        parser, num_parallel_calls=num_threads).shuffle(config.capacity).repeat()
+    if config.is_bucket:
+        buckets = [tf.constant(num) for num in range(*config.bucket_range)]
+
+        def key_func(context_idxs, ques_idxs, context_char_idxs, ques_char_idxs, y1, y2, qa_id):
+            c_len = tf.reduce_sum(
+                tf.cast(tf.cast(context_idxs, tf.bool), tf.int32))
+            t = tf.clip_by_value(buckets, 0, c_len)
+            return tf.argmax(t)
+
+        def reduce_func(key, elements):
+            return elements.batch(config.batch_size)
+
+        dataset = dataset.apply(tf.contrib.data.group_by_window(
+            key_func, reduce_func, window_size=5 * config.batch_size)).shuffle(len(buckets) * 25)
+    else:
+        dataset = dataset.batch(config.batch_size)
+    return dataset
+
+
+def get_dataset(record_file, parser, config):
+    num_threads = tf.constant(config.num_threads, dtype=tf.int32)
+    dataset = tf.data.TFRecordDataset(record_file).map(
+        parser, num_parallel_calls=num_threads).repeat().batch(config.batch_size)
+    return dataset
 
 
 def convert_tokens(eval_file, qa_id, pp1, pp2):
     answer_dict = {}
+    remapped_dict = {}
     for qid, p1, p2 in zip(qa_id, pp1, pp2):
         context = eval_file[str(qid)]["context"]
         spans = eval_file[str(qid)]["spans"]
+        uuid = eval_file[str(qid)]["uuid"]
         start_idx = spans[p1][0]
         end_idx = spans[p2][1]
         answer_dict[str(qid)] = context[start_idx: end_idx]
-    return answer_dict
+        remapped_dict[uuid] = context[start_idx: end_idx]
+    return answer_dict, remapped_dict
 
 
 def evaluate(eval_file, answer_dict):
@@ -93,6 +96,7 @@ def evaluate(eval_file, answer_dict):
 
 
 def normalize_answer(s):
+
     def remove_articles(text):
         return re.sub(r'\b(a|an|the)\b', ' ', text)
 

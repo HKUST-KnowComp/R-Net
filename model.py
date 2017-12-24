@@ -1,6 +1,5 @@
 import tensorflow as tf
-from tensorflow.python.ops.rnn_cell import GRUCell
-from func import stacked_gru, pointer, dot_attention, summ, dropout
+from func import cudnn_gru, native_gru, dot_attention, summ, dropout, ptr_net
 
 
 class Model(object):
@@ -8,11 +7,7 @@ class Model(object):
         self.config = config
         self.global_step = tf.get_variable('global_step', shape=[], dtype=tf.int32,
                                            initializer=tf.constant_initializer(0), trainable=False)
-        self.c, self.q, self.ch, self.qh, self.y1, self.y2, self.qa_id, _ = batch.get_next()
-        self.keep_prob = tf.get_variable("keep_prob", shape=[
-        ], dtype=tf.float32, trainable=False, initializer=tf.constant_initializer(config.keep_prob))
-        self.ptr_keep_prob = tf.get_variable("ptr_keep_prob", shape=[
-        ], dtype=tf.float32, trainable=False, initializer=tf.constant_initializer(config.ptr_keep_prob))
+        self.c, self.q, self.ch, self.qh, self.y1, self.y2, self.qa_id = batch.get_next()
         self.is_train = tf.get_variable(
             "is_train", shape=[], dtype=tf.bool, trainable=False)
         self.word_mat = tf.get_variable("word_mat", initializer=tf.constant(
@@ -62,6 +57,7 @@ class Model(object):
     def ready(self):
         config = self.config
         N, PL, QL, CL, d, dc, dg = config.batch_size, self.c_maxlen, self.q_maxlen, config.char_limit, config.hidden, config.char_dim, config.char_hidden
+        gru = cudnn_gru if config.use_cudnn else native_gru
 
         with tf.variable_scope("emb"):
             with tf.variable_scope("char"):
@@ -69,11 +65,18 @@ class Model(object):
                     self.char_mat, self.ch), [N * PL, CL, dc])
                 qh_emb = tf.reshape(tf.nn.embedding_lookup(
                     self.char_mat, self.qh), [N * QL, CL, dc])
-                _, qh_emb = stacked_gru(qh_emb, dg, num_layers=1, seq_len=self.qh_len,
-                                        keep_prob=self.keep_prob, is_train=self.is_train)
-                tf.get_variable_scope().reuse_variables()
-                _, ch_emb = stacked_gru(ch_emb, dg, num_layers=1, seq_len=self.ch_len,
-                                        keep_prob=self.keep_prob, is_train=self.is_train)
+                ch_emb = dropout(
+                    ch_emb, keep_prob=config.keep_prob, is_train=self.is_train)
+                qh_emb = dropout(
+                    qh_emb, keep_prob=config.keep_prob, is_train=self.is_train)
+                cell_fw = tf.contrib.rnn.GRUCell(dg)
+                cell_bw = tf.contrib.rnn.GRUCell(dg)
+                _, (state_fw, state_bw) = tf.nn.bidirectional_dynamic_rnn(
+                    cell_fw, cell_bw, ch_emb, self.ch_len, dtype=tf.float32)
+                ch_emb = tf.concat([state_fw, state_bw], axis=1)
+                _, (state_fw, state_bw) = tf.nn.bidirectional_dynamic_rnn(
+                    cell_fw, cell_bw, qh_emb, self.qh_len, dtype=tf.float32)
+                qh_emb = tf.concat([state_fw, state_bw], axis=1)
                 qh_emb = tf.reshape(qh_emb, [N, QL, 2 * dg])
                 ch_emb = tf.reshape(ch_emb, [N, PL, 2 * dg])
 
@@ -85,55 +88,42 @@ class Model(object):
             q_emb = tf.concat([q_emb, qh_emb], axis=2)
 
         with tf.variable_scope("encoding"):
-            c, _ = stacked_gru(c_emb, d, num_layers=3, seq_len=self.c_len, keep_prob=self.keep_prob,
-                               is_train=self.is_train)
-            tf.get_variable_scope().reuse_variables()
-            q, _ = stacked_gru(q_emb, d, num_layers=3, seq_len=self.q_len, keep_prob=self.keep_prob,
-                               is_train=self.is_train)
+            rnn = gru(num_layers=3, num_units=d, batch_size=N, input_size=c_emb.get_shape(
+            ).as_list()[-1], keep_prob=config.keep_prob, is_train=self.is_train)
+            c = rnn(c_emb, seq_len=self.c_len)
+            q = rnn(q_emb, seq_len=self.q_len)
 
         with tf.variable_scope("attention"):
             qc_att = dot_attention(c, q, mask=self.q_mask, hidden=d,
-                                   keep_prob=self.keep_prob, is_train=self.is_train)
-            att, _ = stacked_gru(qc_att, d, num_layers=1, seq_len=self.c_len,
-                                 keep_prob=self.keep_prob, is_train=self.is_train)
+                                   keep_prob=config.keep_prob, is_train=self.is_train)
+            rnn = gru(num_layers=1, num_units=d, batch_size=N, input_size=qc_att.get_shape(
+            ).as_list()[-1], keep_prob=config.keep_prob, is_train=self.is_train)
+            att = rnn(qc_att, seq_len=self.c_len)
 
         with tf.variable_scope("match"):
             self_att = dot_attention(
-                att, att, mask=self.c_mask, hidden=d, keep_prob=self.keep_prob, is_train=self.is_train)
-            match, _ = stacked_gru(self_att, d, num_layers=1, seq_len=self.c_len,
-                                   keep_prob=self.keep_prob, is_train=self.is_train)
+                att, att, mask=self.c_mask, hidden=d, keep_prob=config.keep_prob, is_train=self.is_train)
+            rnn = gru(num_layers=1, num_units=d, batch_size=N, input_size=self_att.get_shape(
+            ).as_list()[-1], keep_prob=config.keep_prob, is_train=self.is_train)
+            match = rnn(self_att, seq_len=self.c_len)
 
         with tf.variable_scope("pointer"):
             init = summ(q[:, :, -2 * d:], d, mask=self.q_mask,
-                        keep_prob=self.ptr_keep_prob, is_train=self.is_train)
-            d_match = dropout(
-                match, keep_prob=self.ptr_keep_prob, is_train=self.is_train)
-            hidden = init.get_shape().as_list()[-1]
-            cell_fw = GRUCell(hidden)
-            cell_bw = GRUCell(hidden)
-            with tf.variable_scope("fw"):
-                inp, logits1_fw = pointer(d_match, init, d, mask=self.c_mask)
-                _, state = cell_fw(inp, init)
-                tf.get_variable_scope().reuse_variables()
-                _, logits2_fw = pointer(d_match, state, d, mask=self.c_mask)
-            with tf.variable_scope("bw"):
-                inp, logits2_bw = pointer(d_match, init, d, mask=self.c_mask)
-                _, state = cell_bw(inp, init)
-                tf.get_variable_scope().reuse_variables()
-                _, logits1_bw = pointer(d_match, state, d, mask=self.c_mask)
-            logits1 = (tf.nn.softmax(logits1_fw) +
-                       tf.nn.softmax(logits1_bw)) / 2.
-            logits2 = (tf.nn.softmax(logits2_fw) +
-                       tf.nn.softmax(logits2_bw)) / 2.
+                        keep_prob=config.ptr_keep_prob, is_train=self.is_train)
+            pointer = ptr_net(batch=N, hidden=init.get_shape().as_list(
+            )[-1], keep_prob=config.ptr_keep_prob, is_train=self.is_train)
+            logits1, logits2 = pointer(init, match, d, self.c_mask)
 
         with tf.variable_scope("predict"):
-            outer = tf.matmul(tf.expand_dims(logits1, axis=2),
-                              tf.expand_dims(logits2, axis=1))
+            outer = tf.matmul(tf.expand_dims(tf.nn.softmax(logits1), axis=2),
+                              tf.expand_dims(tf.nn.softmax(logits2), axis=1))
             outer = tf.matrix_band_part(outer, 0, 15)
             self.yp1 = tf.argmax(tf.reduce_max(outer, axis=2), axis=1)
             self.yp2 = tf.argmax(tf.reduce_max(outer, axis=1), axis=1)
-            losses = -tf.reduce_sum(self.y1 * tf.log(logits1 + 1e-5), axis=1)
-            losses2 = -tf.reduce_sum(self.y2 * tf.log(logits2 + 1e-5), axis=1)
+            losses = tf.nn.softmax_cross_entropy_with_logits(
+                logits=logits1, labels=self.y1)
+            losses2 = tf.nn.softmax_cross_entropy_with_logits(
+                logits=logits2, labels=self.y2)
             self.loss = tf.reduce_mean(losses + losses2)
 
     def get_loss(self):
