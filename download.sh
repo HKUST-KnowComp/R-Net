@@ -13,5 +13,11 @@ mkdir -p $GLOVE_DIR
 wget http://nlp.stanford.edu/data/glove.840B.300d.zip -O $GLOVE_DIR/glove.840B.300d.zip
 unzip $GLOVE_DIR/glove.840B.300d.zip -d $GLOVE_DIR
 
+# Download fasttext
+# FASTTEXT_DIR=~/data/fasttext
+# mkdir -p $FASTTEXT_DIR
+# wget https://s3-us-west-1.amazonaws.com/fasttext-vectors/wiki-news-300d-1M.vec.zip -O $FASTTEXT_DIR/wiki-news-300d-1M.vec.zip
+# unzip $FASTTEXT_DIR/wiki-news-300d-1M.vec.zip -d $FASTTEXT_DIR
+
 # Download Spacy language models
 python3 -m spacy download en
