@@ -12,6 +12,7 @@ GLOVE_DIR=~/data/glove
 mkdir -p $GLOVE_DIR
 wget http://nlp.stanford.edu/data/glove.840B.300d.zip -O $GLOVE_DIR/glove.840B.300d.zip
 unzip $GLOVE_DIR/glove.840B.300d.zip -d $GLOVE_DIR
+wget https://raw.githubusercontent.com/minimaxir/char-embeddings/master/glove.840B.300d-char.txt -O $GLOVE_DIR/glove.840B.300d-char.txt
 
 # Download fasttext
 # FASTTEXT_DIR=~/data/fasttext
