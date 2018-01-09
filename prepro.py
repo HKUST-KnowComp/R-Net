@@ -2,7 +2,7 @@ import tensorflow as tf
 import random
 from tqdm import tqdm
 import spacy
-import json
+import ujson as json
 from collections import Counter
 import numpy as np
 
@@ -95,7 +95,7 @@ def get_embedding(counter, data_type, limit=-1, emb_file=None, size=None, vec_si
                     embedding_dict[word] = vector
         print("{} / {} tokens have corresponding word embedding vector".format(
             len(embedding_dict), len(filtered_elements)))
-    elif (data_type=="char"):
+    elif (data_type == "char"):
         assert size is not None
         assert vec_size is not None
         with open(emb_file, "r", encoding="utf-8") as fh:
