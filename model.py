@@ -12,8 +12,8 @@ class Model(object):
             "is_train", shape=[], dtype=tf.bool, trainable=False)
         self.word_mat = tf.get_variable("word_mat", initializer=tf.constant(
             word_mat, dtype=tf.float32), trainable=False)
-        self.char_mat = tf.get_variable(
-            "char_mat", char_mat.shape, dtype=tf.float32)
+        self.char_mat = tf.get_variable("char_mat", initializer=tf.constant(
+            char_mat, dtype=tf.float32), trainable=False)
 
         self.c_mask = tf.cast(self.c, tf.bool)
         self.q_mask = tf.cast(self.q, tf.bool)

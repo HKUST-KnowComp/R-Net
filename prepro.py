@@ -93,14 +93,21 @@ def get_embedding(counter, data_type, limit=-1, emb_file=None, size=None, vec_si
                 vector = list(map(float, array[-vec_size:]))
                 if word in counter and counter[word] > limit:
                     embedding_dict[word] = vector
-        print("{} / {} tokens have corresponding embedding vector".format(
+        print("{} / {} tokens have corresponding word embedding vector".format(
             len(embedding_dict), len(filtered_elements)))
-    else:
+    elif (data_type=="char"):
+        assert size is not None
         assert vec_size is not None
-        for token in filtered_elements:
-            embedding_dict[token] = [0. for _ in range(vec_size)]
-        print("{} tokens have corresponding embedding vector".format(
-            len(filtered_elements)))
+        with open(emb_file, "r", encoding="utf-8") as fh:
+            for line in tqdm(fh, total=size):
+                array = line.split()
+                char = "".join(array[0:-vec_size])
+                vector = list(map(float, array[-vec_size:]))
+                if char in counter and counter[char] > limit:
+                    embedding_dict[char] = vector
+        print("{} / {} tokens have corresponding char embedding vector".format(
+            len(embedding_dict), len(filtered_elements)))
+
     NULL = "--NULL--"
     OOV = "--OOV--"
     token2idx_dict = {token: idx for idx,
@@ -207,9 +214,9 @@ def prepro(config):
     test_examples, test_eval = process_file(
         config.test_file, "test", word_counter, char_counter)
     word_emb_mat, word2idx_dict = get_embedding(
-        word_counter, "word", emb_file=config.glove_file, size=config.glove_size, vec_size=config.glove_dim)
+        word_counter, "word", emb_file=config.glove_word_file, size=config.glove_word_size, vec_size=config.glove_dim)
     char_emb_mat, char2idx_dict = get_embedding(
-        char_counter, "char", vec_size=config.char_dim)
+        char_counter, "char", emb_file=config.glove_char_file, size=config.glove_char_size, vec_size=config.glove_dim)
     build_features(config, train_examples, "train",
                    config.train_record_file, word2idx_dict, char2idx_dict)
     dev_meta = build_features(config, dev_examples, "dev",
