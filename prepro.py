@@ -93,20 +93,14 @@ def get_embedding(counter, data_type, limit=-1, emb_file=None, size=None, vec_si
                 vector = list(map(float, array[-vec_size:]))
                 if word in counter and counter[word] > limit:
                     embedding_dict[word] = vector
-        print("{} / {} tokens have corresponding word embedding vector".format(
-            len(embedding_dict), len(filtered_elements)))
-    elif (data_type == "char"):
-        assert size is not None
+        print("{} / {} tokens have corresponding {} embedding vector".format(
+            len(embedding_dict), len(filtered_elements), data_type))
+    else:
         assert vec_size is not None
-        with open(emb_file, "r", encoding="utf-8") as fh:
-            for line in tqdm(fh, total=size):
-                array = line.split()
-                char = "".join(array[0:-vec_size])
-                vector = list(map(float, array[-vec_size:]))
-                if char in counter and counter[char] > limit:
-                    embedding_dict[char] = vector
-        print("{} / {} tokens have corresponding char embedding vector".format(
-            len(embedding_dict), len(filtered_elements)))
+        for token in filtered_elements:
+            embedding_dict[token] = [0. for _ in range(vec_size)]
+        print("{} tokens have corresponding embedding vector".format(
+            len(filtered_elements)))
 
     NULL = "--NULL--"
     OOV = "--OOV--"
