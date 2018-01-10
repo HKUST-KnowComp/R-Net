@@ -66,4 +66,10 @@ The default directory for tensorboard log file is `log/event`
 |E5-2640|6.21|3.56|-|-|
 |TITAN X|2.72|1.67|0.61|0.35|
 
+## Extensions
+
+These settings may increase the score but not used in the model by default. You can turn these settings on in `config.py`. 
+
+ * [Pretrained GloVe character embedding](https://github.com/minimaxir/char-embeddings). Contributed by yanghanxy.
+ * [Fasttext Embedding](https://fasttext.cc/docs/en/english-vectors.html). Contributed by xiongyifan. May increase the F1 by 1% (reported by xiongyifan).
 

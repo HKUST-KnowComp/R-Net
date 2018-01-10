@@ -98,7 +98,8 @@ def get_embedding(counter, data_type, limit=-1, emb_file=None, size=None, vec_si
     else:
         assert vec_size is not None
         for token in filtered_elements:
-            embedding_dict[token] = [0. for _ in range(vec_size)]
+            embedding_dict[token] = [np.random.normal(
+                scale=0.1) for _ in range(vec_size)]
         print("{} tokens have corresponding embedding vector".format(
             len(filtered_elements)))
 
@@ -207,16 +208,24 @@ def prepro(config):
         config.dev_file, "dev", word_counter, char_counter)
     test_examples, test_eval = process_file(
         config.test_file, "test", word_counter, char_counter)
+
+    word_emb_file = config.fasttext_file if config.fasttext else config.glove_word_file
+    char_emb_file = config.glove_char_file if config.pretrained_char else None
+    char_emb_size = config.glove_char_size if config.pretrained_char else None
+    char_emb_dim = config.glove_dim if config.pretrained_char else config.char_dim
+
     word_emb_mat, word2idx_dict = get_embedding(
-        word_counter, "word", emb_file=config.glove_word_file, size=config.glove_word_size, vec_size=config.glove_dim)
+        word_counter, "word", emb_file=word_emb_file, size=config.glove_word_size, vec_size=config.glove_dim)
     char_emb_mat, char2idx_dict = get_embedding(
-        char_counter, "char", emb_file=config.glove_char_file, size=config.glove_char_size, vec_size=config.glove_dim)
+        char_counter, "char", emb_file=char_emb_file, size=char_emb_size, vec_size=char_emb_dim)
+
     build_features(config, train_examples, "train",
                    config.train_record_file, word2idx_dict, char2idx_dict)
     dev_meta = build_features(config, dev_examples, "dev",
                               config.dev_record_file, word2idx_dict, char2idx_dict)
     test_meta = build_features(config, test_examples, "test",
                                config.test_record_file, word2idx_dict, char2idx_dict, is_test=True)
+
     save(config.word_emb_file, word_emb_mat, message="word embedding")
     save(config.char_emb_file, char_emb_mat, message="char embedding")
     save(config.train_eval_file, train_eval, message="train eval")
