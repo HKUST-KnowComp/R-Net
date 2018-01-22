@@ -93,7 +93,7 @@ class native_gru:
                     inputs_bw = tf.reverse_sequence(
                         outputs[-1] * mask_bw, seq_lengths=seq_len, seq_dim=1, batch_dim=0)
                     out_bw, _ = tf.nn.dynamic_rnn(
-                        gru_fw, inputs_bw, seq_len, initial_state=init_bw, dtype=tf.float32)
+                        gru_bw, inputs_bw, seq_len, initial_state=init_bw, dtype=tf.float32)
                     out_bw = tf.reverse_sequence(
                         out_bw, seq_lengths=seq_len, seq_dim=1, batch_dim=0)
                 outputs.append(tf.concat([out_fw, out_bw], axis=2))
