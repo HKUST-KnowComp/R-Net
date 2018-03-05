@@ -3,11 +3,14 @@
   * Should you have any question, please contact Wenxuan Zhou (wzhouad@connect.ust.hk).
 
 ## Requirements
+
+There have been a lot of known problems caused by using different software versions. Please check your versions before opening issues or emailing me.
+
 #### General
   * Python >= 3.4
   * unzip, wget
 #### Python Packages
-  * Tensorflow == 1.4.0
+  * tensorflow-gpu == 1.4.0
   * spaCy >= 2.0.0
   * tqdm
   * ujson
