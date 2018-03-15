@@ -5,6 +5,7 @@ from prepro import prepro
 from main import train, test
 
 flags = tf.flags
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 home = os.path.expanduser("~")
 train_file = os.path.join(home, "data", "squad", "train-v1.1.json")
@@ -26,6 +27,8 @@ dev_eval = os.path.join(target_dir, "dev_eval.json")
 test_eval = os.path.join(target_dir, "test_eval.json")
 dev_meta = os.path.join(target_dir, "dev_meta.json")
 test_meta = os.path.join(target_dir, "test_meta.json")
+word2idx_file = os.path.join(target_dir, "word2idx.json")
+char2idx_file = os.path.join(target_dir, "char2idx.json")
 answer_file = os.path.join(answer_dir, "answer.json")
 
 if not os.path.exists(target_dir):
@@ -37,27 +40,29 @@ if not os.path.exists(save_dir):
 if not os.path.exists(answer_dir):
     os.makedirs(answer_dir)
 
-flags.DEFINE_string("mode", "train", "Running mode train/debug/test")
+flags.DEFINE_string("mode", "train", "train/debug/test")
 
-flags.DEFINE_string("target_dir", target_dir, "Target directory for out data")
-flags.DEFINE_string("log_dir", log_dir, "Directory for tf event")
-flags.DEFINE_string("save_dir", save_dir, "Directory for saving model")
-flags.DEFINE_string("train_file", train_file, "Train source file")
-flags.DEFINE_string("dev_file", dev_file, "Dev source file")
-flags.DEFINE_string("test_file", test_file, "Test source file")
-flags.DEFINE_string("glove_word_file", glove_word_file, "Glove word embedding source file")
+flags.DEFINE_string("target_dir", target_dir, "")
+flags.DEFINE_string("log_dir", log_dir, "")
+flags.DEFINE_string("save_dir", save_dir, "")
+flags.DEFINE_string("train_file", train_file, "")
+flags.DEFINE_string("dev_file", dev_file, "")
+flags.DEFINE_string("test_file", test_file, "")
+flags.DEFINE_string("glove_word_file", glove_word_file, "")
 
-flags.DEFINE_string("train_record_file", train_record_file, "Out file for train data")
-flags.DEFINE_string("dev_record_file", dev_record_file, "Out file for dev data")
-flags.DEFINE_string("test_record_file", test_record_file, "Out file for test data")
-flags.DEFINE_string("word_emb_file", word_emb_file, "Out file for word embedding")
-flags.DEFINE_string("char_emb_file", char_emb_file, "Out file for char embedding")
-flags.DEFINE_string("train_eval_file", train_eval, "Out file for train eval")
-flags.DEFINE_string("dev_eval_file", dev_eval, "Out file for dev eval")
-flags.DEFINE_string("test_eval_file", test_eval, "Out file for test eval")
-flags.DEFINE_string("dev_meta", dev_meta, "Out file for dev meta")
-flags.DEFINE_string("test_meta", test_meta, "Out file for test meta")
-flags.DEFINE_string("answer_file", answer_file, "Out file for answer")
+flags.DEFINE_string("train_record_file", train_record_file, "")
+flags.DEFINE_string("dev_record_file", dev_record_file, "")
+flags.DEFINE_string("test_record_file", test_record_file, "")
+flags.DEFINE_string("word_emb_file", word_emb_file, "")
+flags.DEFINE_string("char_emb_file", char_emb_file, "")
+flags.DEFINE_string("train_eval_file", train_eval, "")
+flags.DEFINE_string("dev_eval_file", dev_eval, "")
+flags.DEFINE_string("test_eval_file", test_eval, "")
+flags.DEFINE_string("dev_meta", dev_meta, "")
+flags.DEFINE_string("test_meta", test_meta, "")
+flags.DEFINE_string("word2idx_file", word2idx_file, "")
+flags.DEFINE_string("char2idx_file", char2idx_file, "")
+flags.DEFINE_string("answer_file", answer_file, "")
 
 
 flags.DEFINE_integer("glove_char_size", 94, "Corpus size for Glove")
@@ -67,38 +72,40 @@ flags.DEFINE_integer("char_dim", 8, "Embedding dimension for char")
 
 flags.DEFINE_integer("para_limit", 400, "Limit length for paragraph")
 flags.DEFINE_integer("ques_limit", 50, "Limit length for question")
-flags.DEFINE_integer("test_para_limit", 1000, "Limit length for paragraph in test file")
-flags.DEFINE_integer("test_ques_limit", 100, "Limit length for question in test file")
+flags.DEFINE_integer("test_para_limit", 1000,
+                     "Max length for paragraph in test")
+flags.DEFINE_integer("test_ques_limit", 100, "Max length of questions in test")
 flags.DEFINE_integer("char_limit", 16, "Limit length for character")
 flags.DEFINE_integer("word_count_limit", -1, "Min count for word")
 flags.DEFINE_integer("char_count_limit", -1, "Min count for char")
 
 flags.DEFINE_integer("capacity", 15000, "Batch size of dataset shuffle")
 flags.DEFINE_integer("num_threads", 4, "Number of threads in input pipeline")
-flags.DEFINE_boolean("use_cudnn", True, "Whether to use cudnn rnn (should be False for CPU)")
-flags.DEFINE_boolean("is_bucket", False, "build bucket batch iterator or not")
-flags.DEFINE_integer("bucket_range", [40, 401, 40], "the range of bucket")
+flags.DEFINE_boolean("use_cudnn", True, "Whether to use cudnn (only for GPU)")
+flags.DEFINE_boolean("is_bucket", False, "Whether to use bucketing")
+flags.DEFINE_list("bucket_range", [0, 400, 40], "range of bucket")
 
 flags.DEFINE_integer("batch_size", 64, "Batch size")
 flags.DEFINE_integer("num_steps", 60000, "Number of steps")
-flags.DEFINE_integer("checkpoint", 1000, "checkpoint to save and evaluate the model")
+flags.DEFINE_integer("checkpoint", 1000, "checkpoint for evaluation")
 flags.DEFINE_integer("period", 100, "period to save batch loss")
-flags.DEFINE_integer("val_num_batches", 150, "Number of batches to evaluate the model")
-flags.DEFINE_float("init_lr", 0.5, "Initial learning rate for Adadelta")
-flags.DEFINE_float("keep_prob", 0.7, "Dropout keep prob in rnn")
-flags.DEFINE_float("ptr_keep_prob", 0.7, "Dropout keep prob for pointer network")
+flags.DEFINE_integer("val_num_batches", 150, "Num of batches for evaluation")
+flags.DEFINE_float("init_lr", 0.5, "Initial lr for Adadelta")
+flags.DEFINE_float("keep_prob", 0.7, "Keep prob in rnn")
+flags.DEFINE_float("ptr_keep_prob", 0.7, "Keep prob for pointer network")
 flags.DEFINE_float("grad_clip", 5.0, "Global Norm gradient clipping rate")
 flags.DEFINE_integer("hidden", 75, "Hidden size")
-flags.DEFINE_integer("char_hidden", 100, "GRU dimention for char")
-flags.DEFINE_integer("patience", 3, "Patience for learning rate decay")
+flags.DEFINE_integer("char_hidden", 100, "GRU dim for char")
+flags.DEFINE_integer("patience", 3, "Patience for lr decay")
 
-# Extensions (Uncomment corresponding code in download.sh to download the required data)
-glove_char_file = os.path.join(home, "data", "glove", "glove.840B.300d-char.txt")
-flags.DEFINE_string("glove_char_file", glove_char_file, "Glove character embedding source file")
-flags.DEFINE_boolean("pretrained_char", False, "Whether to use pretrained character embedding")
+# Extensions (Uncomment corresponding line in download.sh to download the required data)
+glove_char_file = os.path.join(
+    home, "data", "glove", "glove.840B.300d-char.txt")
+flags.DEFINE_string("glove_char_file", glove_char_file, "Glove character embedding")
+flags.DEFINE_boolean("pretrained_char", False, "Whether to use pretrained char embedding")
 
 fasttext_file = os.path.join(home, "data", "fasttext", "wiki-news-300d-1M.vec")
-flags.DEFINE_string("fasttext_file", fasttext_file, "Fasttext word embedding source file")
+flags.DEFINE_string("fasttext_file", fasttext_file, "Fasttext word embedding")
 flags.DEFINE_boolean("fasttext", False, "Whether to use fasttext")
 
 
@@ -115,8 +122,6 @@ def main(_):
         config.period = 1
         train(config)
     elif config.mode == "test":
-        if config.use_cudnn:
-            print("Warning: Due to a known bug in Tensorlfow, the parameters of CudnnGRU may not be properly restored.")
         test(config)
     else:
         print("Unknown mode")

@@ -10,7 +10,7 @@ There have been a lot of known problems caused by using different software versi
   * Python >= 3.4
   * unzip, wget
 #### Python Packages
-  * tensorflow-gpu == 1.4.0
+  * tensorflow-gpu >= 1.5.0
   * spaCy >= 2.0.0
   * tqdm
   * ujson
@@ -47,7 +47,7 @@ The default directory for tensorboard log file is `log/event`
   * To solve the degradation problem in stacked RNN, outputs of each layer are concatenated to produce the final output.
   * When the loss on dev set increases in a certain period, the learning rate is halved.
   * During prediction, the project adopts search method presented in [Machine Comprehension Using Match-LSTM and Answer Pointer](https://arxiv.org/abs/1608.07905).
-  * To address efficiency issue, this implementation uses bucketing method (contributed by xiongyifan) and CudnnGRU. Due to a known bug [#13254](https://github.com/tensorflow/tensorflow/issues/13254) in Tensorflow, the weights of CudnnGRU may not be properly restored. Check the test score if you want to use it for prediction. The bucketing method can speedup the training, but will lower the F1 score by 0.3%.
+  * To address efficiency issue, this implementation uses bucketing method (contributed by xiongyifan) and CudnnGRU. The bucketing method can speedup training, but will lower the F1 score by 0.3%.
 
 ## Performance
 
@@ -67,7 +67,7 @@ The default directory for tensorboard log file is `log/event`
 ||Native|Native + Bucket|Cudnn|Cudnn + Bucket|
 |---|---|---|---|---|
 |E5-2640|6.21|3.56|-|-|
-|TITAN X|2.72|1.67|0.61|0.35|
+|TITAN X|2.56|1.31|0.41|0.28|
 
 ## Extensions
 

@@ -1,5 +1,4 @@
 import tensorflow as tf
-from tensorflow.python.ops.rnn_cell import GRUCell
 
 INF = 1e30
 
@@ -9,27 +8,23 @@ class cudnn_gru:
     def __init__(self, num_layers, num_units, batch_size, input_size, keep_prob=1.0, is_train=None, scope=None):
         self.num_layers = num_layers
         self.grus = []
-        self.params = []
         self.inits = []
         self.dropout_mask = []
         for layer in range(num_layers):
             input_size_ = input_size if layer == 0 else 2 * num_units
             gru_fw = tf.contrib.cudnn_rnn.CudnnGRU(
-                num_layers=1, num_units=num_units, input_size=input_size_)
+                1, num_units, kernel_initializer=tf.random_normal_initializer(stddev=0.1))
             gru_bw = tf.contrib.cudnn_rnn.CudnnGRU(
-                num_layers=1, num_units=num_units, input_size=input_size_)
-            param_fw = tf.Variable(tf.random_uniform(
-                [gru_fw.params_size()], -0.1, 0.1), validate_shape=False)
-            param_bw = tf.Variable(tf.random_uniform(
-                [gru_bw.params_size()], -0.1, 0.1), validate_shape=False)
-            init_fw = tf.Variable(tf.zeros([1, batch_size, num_units]))
-            init_bw = tf.Variable(tf.zeros([1, batch_size, num_units]))
+                1, num_units, kernel_initializer=tf.random_normal_initializer(stddev=0.1))
+            init_fw = tf.tile(tf.Variable(
+                tf.zeros([1, 1, num_units])), [1, batch_size, 1])
+            init_bw = tf.tile(tf.Variable(
+                tf.zeros([1, 1, num_units])), [1, batch_size, 1])
             mask_fw = dropout(tf.ones([1, batch_size, input_size_], dtype=tf.float32),
                               keep_prob=keep_prob, is_train=is_train, mode=None)
             mask_bw = dropout(tf.ones([1, batch_size, input_size_], dtype=tf.float32),
                               keep_prob=keep_prob, is_train=is_train, mode=None)
             self.grus.append((gru_fw, gru_bw, ))
-            self.params.append((param_fw, param_bw, ))
             self.inits.append((init_fw, init_bw, ))
             self.dropout_mask.append((mask_fw, mask_bw, ))
 
@@ -37,15 +32,15 @@ class cudnn_gru:
         outputs = [tf.transpose(inputs, [1, 0, 2])]
         for layer in range(self.num_layers):
             gru_fw, gru_bw = self.grus[layer]
-            param_fw, param_bw = self.params[layer]
             init_fw, init_bw = self.inits[layer]
             mask_fw, mask_bw = self.dropout_mask[layer]
-            with tf.variable_scope("fw"):
-                out_fw, _ = gru_fw(outputs[-1] * mask_fw, init_fw, param_fw)
-            with tf.variable_scope("bw"):
+            with tf.variable_scope("fw_{}".format(layer)):
+                out_fw, _ = gru_fw(
+                    outputs[-1] * mask_fw, initial_state=(init_fw, ))
+            with tf.variable_scope("bw_{}".format(layer)):
                 inputs_bw = tf.reverse_sequence(
                     outputs[-1] * mask_bw, seq_lengths=seq_len, seq_dim=0, batch_dim=1)
-                out_bw, _ = gru_bw(inputs_bw, init_bw, param_bw)
+                out_bw, _ = gru_bw(inputs_bw, initial_state=(init_bw, ))
                 out_bw = tf.reverse_sequence(
                     out_bw, seq_lengths=seq_len, seq_dim=0, batch_dim=1)
             outputs.append(tf.concat([out_fw, out_bw], axis=2))
@@ -67,10 +62,14 @@ class native_gru:
         self.scope = scope
         for layer in range(num_layers):
             input_size_ = input_size if layer == 0 else 2 * num_units
-            gru_fw = tf.contrib.rnn.GRUCell(num_units)
-            gru_bw = tf.contrib.rnn.GRUCell(num_units)
-            init_fw = tf.Variable(tf.zeros([batch_size, num_units]))
-            init_bw = tf.Variable(tf.zeros([batch_size, num_units]))
+            gru_fw = tf.contrib.rnn.GRUCell(
+                num_units, kernel_initializer=tf.random_normal_initializer(stddev=0.1))
+            gru_bw = tf.contrib.rnn.GRUCell(
+                num_units, kernel_initializer=tf.random_normal_initializer(stddev=0.1))
+            init_fw = tf.tile(tf.Variable(
+                tf.zeros([1, num_units])), [batch_size, 1])
+            init_bw = tf.tile(tf.Variable(
+                tf.zeros([1, num_units])), [batch_size, 1])
             mask_fw = dropout(tf.ones([batch_size, 1, input_size_], dtype=tf.float32),
                               keep_prob=keep_prob, is_train=is_train, mode=None)
             mask_bw = dropout(tf.ones([batch_size, 1, input_size_], dtype=tf.float32),
@@ -106,7 +105,7 @@ class native_gru:
 
 class ptr_net:
     def __init__(self, batch, hidden, keep_prob=1.0, is_train=None, scope="ptr_net"):
-        self.gru = GRUCell(hidden)
+        self.gru = tf.contrib.rnn.GRUCell(hidden)
         self.batch = batch
         self.scope = scope
         self.keep_prob = keep_prob
