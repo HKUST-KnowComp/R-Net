@@ -1,4 +1,5 @@
 import tensorflow as tf
+import numpy as np
 import re
 from collections import Counter
 import string
@@ -46,10 +47,10 @@ def get_batch_dataset(record_file, parser, config):
         def key_func(context_idxs, ques_idxs, context_char_idxs, ques_char_idxs, y1, y2, qa_id):
             c_len = tf.reduce_sum(
                 tf.cast(tf.cast(context_idxs, tf.bool), tf.int32))
-            buckets_min = buckets[:-1]
-            buckets_max = buckets[1:]
-            conditions_c = tf.logical_and(tf.less_equal(
-                buckets_min, c_len), tf.less(c_len, buckets_max))
+            buckets_min = [np.iinfo(np.int32).min] + buckets
+            buckets_max = buckets + [np.iinfo(np.int32).max]
+            conditions_c = tf.logical_and(
+                tf.less(buckets_min, c_len), tf.less_equal(c_len, buckets_max))
             bucket_id = tf.reduce_min(tf.where(conditions_c))
             return bucket_id
 
