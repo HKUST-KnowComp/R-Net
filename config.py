@@ -83,7 +83,7 @@ flags.DEFINE_integer("capacity", 15000, "Batch size of dataset shuffle")
 flags.DEFINE_integer("num_threads", 4, "Number of threads in input pipeline")
 flags.DEFINE_boolean("use_cudnn", True, "Whether to use cudnn (only for GPU)")
 flags.DEFINE_boolean("is_bucket", False, "Whether to use bucketing")
-flags.DEFINE_list("bucket_range", [0, 400, 40], "range of bucket")
+flags.DEFINE_list("bucket_range", [0, 401, 40], "range of bucket")
 
 flags.DEFINE_integer("batch_size", 64, "Batch size")
 flags.DEFINE_integer("num_steps", 60000, "Number of steps")
@@ -101,8 +101,10 @@ flags.DEFINE_integer("patience", 3, "Patience for lr decay")
 # Extensions (Uncomment corresponding line in download.sh to download the required data)
 glove_char_file = os.path.join(
     home, "data", "glove", "glove.840B.300d-char.txt")
-flags.DEFINE_string("glove_char_file", glove_char_file, "Glove character embedding")
-flags.DEFINE_boolean("pretrained_char", False, "Whether to use pretrained char embedding")
+flags.DEFINE_string("glove_char_file", glove_char_file,
+                    "Glove character embedding")
+flags.DEFINE_boolean("pretrained_char", False,
+                     "Whether to use pretrained char embedding")
 
 fasttext_file = os.path.join(home, "data", "fasttext", "wiki-news-300d-1M.vec")
 flags.DEFINE_string("fasttext_file", fasttext_file, "Fasttext word embedding")
