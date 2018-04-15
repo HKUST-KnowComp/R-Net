@@ -40,6 +40,8 @@ python evaluate-v1.1.py ~/data/squad/dev-v1.1.json log/answer/answer.json
 
 The default directory for tensorboard log file is `log/event`
 
+See release for trained model.
+
 ## Detailed Implementaion
 
   * The original paper uses additive attention, which consumes lots of memory. This project adopts scaled multiplicative attention presented in [Attention Is All You Need](https://arxiv.org/abs/1706.03762).
