@@ -55,7 +55,9 @@ class InfModel(object):
         self.ready()
 
     def ready(self):
-        N, PL, QL, CL, d, dc, dg = 1, self.c_maxlen, self.q_maxlen, char_limit, hidden, char_dim, char_hidden
+        N, PL, QL, CL, d, dc, dg = \
+            1, self.c_maxlen, self.q_maxlen, char_limit, hidden, char_dim, \
+            char_hidden
         gru = cudnn_gru if use_cudnn else native_gru
 
         with tf.variable_scope("emb"):
@@ -134,10 +136,14 @@ class Inference(object):
     def response(self, context, question):
         sess = self.sess
         model = self.model
-        span, context_idxs, ques_idxs, context_char_idxs, ques_char_idxs = self.prepro(
-            context, question)
-        yp1, yp2 = sess.run([model.yp1, model.yp2], feed_dict={
-                            model.c: context_idxs, model.q: ques_idxs, model.ch: context_char_idxs, model.qh: ques_char_idxs})
+        span, context_idxs, ques_idxs, context_char_idxs, ques_char_idxs = \
+            self.prepro(context, question)
+        yp1, yp2 = \
+            sess.run(
+                [model.yp1, model.yp2],
+                feed_dict={
+                    model.c: context_idxs, model.q: ques_idxs,
+                    model.ch: context_char_idxs, model.qh: ques_char_idxs})
         start_idx = span[yp1[0]][0]
         end_idx = span[yp2[0]][1]
         return context[start_idx: end_idx]
