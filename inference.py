@@ -116,7 +116,7 @@ class InfModel(object):
                               tf.expand_dims(tf.nn.softmax(logits2), axis=1))
             outer = tf.cond(
                 self.tokens_in_context < self.max_answer_tokens,
-                lambda: outer,
+                lambda: tf.matrix_band_part(outer, 0, -1),
                 lambda: tf.matrix_band_part(outer, 0, self.max_answer_tokens))
             self.yp1 = tf.argmax(tf.reduce_max(outer, axis=2), axis=1)
             self.yp2 = tf.argmax(tf.reduce_max(outer, axis=1), axis=1)
