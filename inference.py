@@ -27,12 +27,16 @@ char2idx_file = os.path.join(target_dir, "char2idx.json")
 
 
 class InfModel(object):
+    # Used to zero elements in the probability matrix that correspond to answer
+    # spans that are longer than the number of tokens specified here.
+    max_answer_tokens = 15
 
     def __init__(self, word_mat, char_mat):
         self.c = tf.placeholder(tf.int32, [1, None])
         self.q = tf.placeholder(tf.int32, [1, None])
         self.ch = tf.placeholder(tf.int32, [1, None, char_limit])
         self.qh = tf.placeholder(tf.int32, [1, None, char_limit])
+        self.tokens_in_context = tf.placeholder(tf.int64)
 
         self.word_mat = tf.get_variable("word_mat", initializer=tf.constant(
             word_mat, dtype=tf.float32), trainable=False)
@@ -110,7 +114,10 @@ class InfModel(object):
         with tf.variable_scope("predict"):
             outer = tf.matmul(tf.expand_dims(tf.nn.softmax(logits1), axis=2),
                               tf.expand_dims(tf.nn.softmax(logits2), axis=1))
-            outer = tf.matrix_band_part(outer, 0, 15)
+            outer = tf.cond(
+                self.tokens_in_context < self.max_answer_tokens,
+                lambda: outer,
+                lambda: tf.matrix_band_part(outer, 0, self.max_answer_tokens))
             self.yp1 = tf.argmax(tf.reduce_max(outer, axis=2), axis=1)
             self.yp2 = tf.argmax(tf.reduce_max(outer, axis=1), axis=1)
 
@@ -143,7 +150,8 @@ class Inference(object):
                 [model.yp1, model.yp2],
                 feed_dict={
                     model.c: context_idxs, model.q: ques_idxs,
-                    model.ch: context_char_idxs, model.qh: ques_char_idxs})
+                    model.ch: context_char_idxs, model.qh: ques_char_idxs,
+                    model.tokens_in_context: len(span)})
         start_idx = span[yp1[0]][0]
         end_idx = span[yp2[0]][1]
         return context[start_idx: end_idx]
